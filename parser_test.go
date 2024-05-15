@@ -217,6 +217,84 @@ func TestParseQuery(t *testing.T) {
 				NewToken("title", TokenNode),
 			},
 		},
+		{
+			name:  "any element node",
+			input: "/bookstore/*",
+			want: []*Token{
+				NewToken("/", TokenSlash),
+				NewToken("bookstore", TokenNode),
+				NewToken("/", TokenSlash),
+				NewToken("*", TokenStar),
+			},
+		},
+		{
+			name:  "any attribute node",
+			input: "/bookstore/@*",
+			want: []*Token{
+				NewToken("/", TokenSlash),
+				NewToken("bookstore", TokenNode),
+				NewToken("/", TokenSlash),
+				NewToken("@", TokenAt),
+				NewToken("*", TokenStar),
+			},
+		},
+		{
+			name:  "any node of any kind",
+			input: "/bookstore/node()",
+			want: []*Token{
+				NewToken("/", TokenSlash),
+				NewToken("bookstore", TokenNode),
+				NewToken("/", TokenSlash),
+				NewToken("node", TokenNode),
+				NewToken("(", TokenLParen),
+				NewToken(")", TokenRParen),
+			},
+		},
+		{
+			name:  "all child element nodes",
+			input: "/bookstore/*",
+			want: []*Token{
+				NewToken("/", TokenSlash),
+				NewToken("bookstore", TokenNode),
+				NewToken("/", TokenSlash),
+				NewToken("*", TokenStar),
+			},
+		},
+		{
+			name:  "all elements in the message",
+			input: "//*",
+			want: []*Token{
+				NewToken("//", TokenSlashSlash),
+				NewToken("*", TokenStar),
+			},
+		},
+		{
+			name:  "all elements with at least one attribute of any kind",
+			input: "//title[@*]",
+			want: []*Token{
+				NewToken("//", TokenSlashSlash),
+				NewToken("title", TokenNode),
+				NewToken("[", TokenLBracket),
+				NewToken("@", TokenAt),
+				NewToken("*", TokenStar),
+				NewToken("]", TokenRBracket),
+			},
+		},
+		{
+			name:  "several paths",
+			input: "/book/title | /book/price",
+			want: []*Token{
+				NewToken("/", TokenSlash),
+				NewToken("book", TokenNode),
+				NewToken("/", TokenSlash),
+				NewToken("title", TokenNode),
+				NewToken("|", TokenPipe),
+				NewToken("/", TokenSlash),
+				NewToken("book", TokenNode),
+				NewToken("/", TokenSlash),
+				NewToken("price", TokenNode),
+			},
+		},
 	}
 
 	for _, tt := range tests {

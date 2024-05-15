@@ -39,6 +39,7 @@ const (
 	TokenMinus        TokenKind = '-'
 	TokenNode         TokenKind = 'N'
 	TokenNumber       TokenKind = '0'
+	TokenPipe         TokenKind = '|'
 	TokenRBracket     TokenKind = ']'
 	TokenRParen       TokenKind = ')'
 	TokenSingleQuote  TokenKind = '\''

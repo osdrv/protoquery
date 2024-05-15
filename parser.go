@@ -39,12 +39,25 @@ func matchAny(s string, ix int, chs ...TokenKind) bool {
 	return false
 }
 
+func isWhitespace(s string, ix int) bool {
+	return ix < len(s) && s[ix] == ' '
+}
+
+func eatWhitespace(s string, ix int) int {
+	for isWhitespace(s, ix) {
+		ix++
+	}
+	return ix
+}
+
 func parseQuery(query string) ([]*Token, error) {
 	tokens := make([]*Token, 0, 1)
 	ix := 0
 	for ix < len(query) {
 		start := ix
-		if match(query, ix, TokenSlash) {
+		if isWhitespace(query, ix) {
+			ix = eatWhitespace(query, ix)
+		} else if match(query, ix, TokenSlash) {
 			tk := TokenSlash
 			if len(query) > ix && match(query, ix+1, TokenSlash) {
 				tk = TokenSlashSlash
@@ -64,7 +77,7 @@ func parseQuery(query string) ([]*Token, error) {
 			ix++
 			tokens = append(tokens, NewToken(query[start:ix], TokenAt))
 		} else if matchAny(query, ix, TokenLBracket, TokenRBracket, TokenLParen,
-			TokenRParen, TokenStar, TokenEqual, TokenLess, TokenGreater, TokenMinus) {
+			TokenRParen, TokenStar, TokenEqual, TokenLess, TokenGreater, TokenMinus, TokenPipe) {
 			tokens = append(tokens, NewToken(query[ix:ix+1], TokenKind(query[ix])))
 			ix++
 		} else if matchAny(query, ix, TokenSingleQuote, TokenDoubleQuote) {
