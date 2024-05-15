@@ -50,7 +50,7 @@ func eatWhitespace(s string, ix int) int {
 	return ix
 }
 
-func parseQuery(query string) ([]*Token, error) {
+func ParseXPathQuery(query string) ([]*Token, error) {
 	tokens := make([]*Token, 0, 1)
 	ix := 0
 	for ix < len(query) {
@@ -87,7 +87,7 @@ func parseQuery(query string) ([]*Token, error) {
 				ix++
 			}
 			if query[ix] != end {
-				return nil, fmt.Errorf("unterminated string at position %d", ix)
+				return nil, fmt.Errorf("Unterminated string at position %d", ix)
 			}
 			tokens = append(tokens, NewToken(query[start+1:ix], TokenString))
 			ix++
@@ -100,7 +100,7 @@ func parseQuery(query string) ([]*Token, error) {
 			number, ix = readNumber(query, ix)
 			tokens = append(tokens, NewToken(number, TokenNumber))
 		} else {
-			return nil, fmt.Errorf("unexpected character %q at position %d", query[ix], ix)
+			return nil, fmt.Errorf("Unexpected character %q at position %d", query[ix], ix)
 		}
 	}
 	return tokens, nil

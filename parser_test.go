@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestParseQuery(t *testing.T) {
+func TestParseXPathQuery(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
@@ -299,9 +299,9 @@ func TestParseQuery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tokens, err := parseQuery(tt.input)
+			tokens, err := ParseXPathQuery(tt.input)
 			if !errorEqual(tt.wantErr, err) {
-				t.Errorf("parseQuery() error = %v, want %v", err, tt.wantErr)
+				t.Errorf("parseXPathQuery() error = %v, want %v", err, tt.wantErr)
 				return
 			}
 			if tt.wantErr != nil {
