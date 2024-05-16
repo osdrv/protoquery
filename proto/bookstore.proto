@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package protoquery;
+option go_package = "osdrv/protoquery";
+
+// This proto file defines a bookstore message with a repeated book message.
+// Each book message has a title, an author and a price.
+
+// The Book message represents a book.
+message Book {
+  string title = 1;
+  string author = 2;
+  float price = 3;
+}
+
+// The bookstore message represents a bookstore.
+message Bookstore {
+  repeated Book books = 1;
+}
