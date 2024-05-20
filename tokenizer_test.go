@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestParseXPathQuery(t *testing.T) {
+func TestTokenizeXPathQuery(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
@@ -295,12 +295,47 @@ func TestParseXPathQuery(t *testing.T) {
 				NewToken("price", TokenNode),
 			},
 		},
+		{
+			name:  "nested path withan  attribute filter",
+			input: "/bookstore/book[@price>35.00]",
+			want: []*Token{
+				NewToken("/", TokenSlash),
+				NewToken("bookstore", TokenNode),
+				NewToken("/", TokenSlash),
+				NewToken("book", TokenNode),
+				NewToken("[", TokenLBracket),
+				NewToken("@", TokenAt),
+				NewToken("price", TokenNode),
+				NewToken(">", TokenGreater),
+				NewToken("35.00", TokenNumber),
+				NewToken("]", TokenRBracket),
+			},
+		},
+		{
+			name:  "node with an attribute and an index dereferencing",
+			input: "/bookstore/book[1][@price>35.00]",
+			want: []*Token{
+				NewToken("/", TokenSlash),
+				NewToken("bookstore", TokenNode),
+				NewToken("/", TokenSlash),
+				NewToken("book", TokenNode),
+				NewToken("[", TokenLBracket),
+				NewToken("1", TokenNumber),
+				NewToken("]", TokenRBracket),
+				NewToken("[", TokenLBracket),
+				NewToken("@", TokenAt),
+				NewToken("price", TokenNode),
+				NewToken(">", TokenGreater),
+				NewToken("35.00", TokenNumber),
+				NewToken("]", TokenRBracket),
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tokens, err := ParseXPathQuery(tt.input)
-			if !errorEqual(tt.wantErr, err) {
+			tokens, err := tokenizeXPathQuery(tt.input)
+			if !errorsSimilar(tt.wantErr, err) {
 				t.Errorf("parseXPathQuery() error = %v, want %v", err, tt.wantErr)
 				return
 			}

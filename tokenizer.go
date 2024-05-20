@@ -50,7 +50,7 @@ func eatWhitespace(s string, ix int) int {
 	return ix
 }
 
-func ParseXPathQuery(query string) ([]*Token, error) {
+func tokenizeXPathQuery(query string) ([]*Token, error) {
 	tokens := make([]*Token, 0, 1)
 	ix := 0
 	for ix < len(query) {

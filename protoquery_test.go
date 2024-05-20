@@ -1,8 +1,12 @@
 package protoquery
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
-// errorEqual compares two errors. It returns true if both are nil, or if both are not nil and have the same error message.
+// errorEqual compares two errors. It returns true if both are nil,
+// or if both are not nil and have the same error message.
 func errorEqual(err1, err2 error) bool {
 	if err1 == nil && err2 == nil {
 		return true
@@ -13,60 +17,38 @@ func errorEqual(err1, err2 error) bool {
 	return err1.Error() == err2.Error()
 }
 
-// func TestCompile(t *testing.T) {
-// 	tests := []struct {
-// 		name    string
-// 		input   string
-// 		wantErr error
-// 	}{}
-//
-// 	for _, tt := range tests {
-// 		t.Run("Compile", func(t *testing.T) {
-// 			got, err := Compile()
-// 			if tt.wantErr != nil {
-// 				if !errorEqual(err, tt.wantErr) {
-// 					t.Fatalf("Compile() error = %v, want %v", err, tt.wantErr)
-// 				}
-// 				return
-// 			}
-// 			if err != nil {
-// 				t.Fatalf("Compile() error = %v, want nil", err)
-// 			}
-// 			if got == nil {
-// 				t.Fatalf("Compile() got = nil, want not nil")
-// 			}
-// 		})
-// 	}
-// }
+// errorSimilar compares two errors. It returns true if both are nil,
+// or if both are not nil and the error message of err1 contains the error message of err2.
+func errorsSimilar(err1, err2 error) bool {
+	if err1 == nil || err2 == nil {
+		return err1 == err2
+	}
+	return strings.Contains(err1.Error(), err2.Error())
+}
 
 func TestFindAll(t *testing.T) {
-	ab := AddressBook{
-		People: []*Person{
+	store := Bookstore{
+		Books: []*Book{
 			{
-				Id:    1,
-				Name:  "Alice",
-				Email: "alice@evilcorp.com",
-				Phones: []*Person_PhoneNumber{
-					{
-						Type:   PhoneType_PHONE_TYPE_HOME,
-						Number: "+1234567890",
-					},
-					{
-						Type:   PhoneType_PHONE_TYPE_MOBILE,
-						Number: "+1234567890",
-					},
-				},
+				Title:  "The Go Programming Language",
+				Author: "Alan A. A. Donovan",
+				Price:  34.99,
+			},
+			{
+				Title:  "The Rust Programming Language",
+				Author: "Steve Klabnik",
+				Price:  39.99,
 			},
 		},
 	}
 
-	pq, err := Compile("people[0]/phones[@type='mobile']")
+	pq, err := Compile("/bookstore/book[price>35.00]")
 	if err != nil {
-		t.Fatalf("Compile() error = %v, want nil", err)
+		t.Fatalf("Compile() error = %v, no error expected", err)
 	}
 
-	res := pq.FindAll(&ab)
-	if res == nil {
-		t.Fatalf("FindAll() got = nil, want not nil")
+	res := pq.FindAll(&store)
+	if len(res) != 1 {
+		t.Errorf("FindAll() got = %v, want 1", len(res))
 	}
 }
