@@ -34,8 +34,6 @@ func TestCompileQuery(t *testing.T) {
 			want: Query{
 				&NodeQueryStep{
 					name: "nodename",
-				},
-				&AttrFilterStep{
 					predicate: &AttrPredicate{
 						Name: "attr",
 						Cmp:  AttrCmpExist,
@@ -57,8 +55,6 @@ func TestCompileQuery(t *testing.T) {
 			want: Query{
 				&NodeQueryStep{
 					name: "nodename",
-				},
-				&AttrFilterStep{
 					predicate: &AttrPredicate{
 						Name:  "attr",
 						Cmp:   AttrCmpEq,
@@ -96,15 +92,17 @@ func TestCompileQuery(t *testing.T) {
 			want: Query{
 				&NodeQueryStep{
 					name: "nodename",
-				},
-				&IndexQueryStep{
-					index: 1,
-				},
-				&AttrFilterStep{
-					predicate: &AttrPredicate{
-						Name:  "attr",
-						Cmp:   AttrCmpEq,
-						Value: "value",
+					predicate: &AndPredicate{
+						predicates: []Predicate{
+							&IndexPredicate{
+								Index: 1,
+							},
+							&AttrPredicate{
+								Name:  "attr",
+								Cmp:   AttrCmpEq,
+								Value: "value",
+							},
+						},
 					},
 				},
 			},

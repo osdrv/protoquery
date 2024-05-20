@@ -26,47 +26,52 @@ var (
 	}
 )
 
-func compileIndexQueryStep(tokens []*Token, ix int) (*IndexQueryStep, int, error) {
-	iqs := &IndexQueryStep{}
-	if !matchToken(tokens, ix, TokenNumber) {
-		return nil, ix, fmt.Errorf("expected number, got %v", tokens[ix].Kind)
-	}
-	index, err := tokens[ix].IntValue()
-	if err != nil {
-		return nil, 0, err
-	}
-	iqs.index = index
-	ix++
-	return iqs, ix, nil
-}
-
-func compileAttrFilterStep(tokens []*Token, ix int) (*AttrFilterStep, int, error) {
-	afs := &AttrFilterStep{}
-	if !matchToken(tokens, ix, TokenAt) {
-		return nil, ix, fmt.Errorf("expected @, got %v", tokens[ix].Kind)
+func compilePredicate(tokens []*Token, ix int) (Predicate, int, error) {
+	if !matchToken(tokens, ix, TokenLBracket) {
+		return nil, ix, fmt.Errorf("expected [, got %v", tokens[ix].Kind)
 	}
 	ix++
-	if !matchToken(tokens, ix, TokenNode) {
-		return nil, ix, fmt.Errorf("expected attribute name, got %v", tokens[ix].Kind)
-	}
-	afs.predicate = &AttrPredicate{
-		Name: tokens[ix].Value,
-		Cmp:  AttrCmpExist,
-	}
-	ix++
-
-	if matchTokenAny(tokens, ix, TokenEqual, TokenGreater, TokenGreaterEqual,
-		TokenNotEqual, TokenLess, TokenLessEqual) {
-		afs.predicate.Cmp = tokenToCmp[tokens[ix].Kind]
-		ix++
-		if !matchTokenAny(tokens, ix, TokenString, TokenNumber) {
-			return nil, ix, fmt.Errorf("expected string or number, got %v", tokens[ix].Kind)
+	var p Predicate
+	if matchToken(tokens, ix, TokenNumber) {
+		index, err := tokens[ix].IntValue()
+		if err != nil {
+			return nil, 0, err
 		}
-		// TODO(osdrv): are we loosing the type information here?
-		afs.predicate.Value = tokens[ix].Value
+		p = &IndexPredicate{
+			Index: index,
+		}
 		ix++
+	} else {
+		ap := &AttrPredicate{}
+		if !matchToken(tokens, ix, TokenAt) {
+			return nil, ix, fmt.Errorf("expected @, got %v", tokens[ix].Kind)
+		}
+		ix++
+		if !matchToken(tokens, ix, TokenNode) {
+			return nil, ix, fmt.Errorf("expected attribute name, got %v", tokens[ix].Kind)
+		}
+		ap.Name = tokens[ix].Value
+		ap.Cmp = AttrCmpExist
+		ix++
+
+		if matchTokenAny(tokens, ix, TokenEqual, TokenGreater, TokenGreaterEqual,
+			TokenNotEqual, TokenLess, TokenLessEqual) {
+			ap.Cmp = tokenToCmp[tokens[ix].Kind]
+			ix++
+			if !matchTokenAny(tokens, ix, TokenString, TokenNumber) {
+				return nil, ix, fmt.Errorf("expected string or number, got %v", tokens[ix].Kind)
+			}
+			// TODO(osdrv): are we loosing the type information here?
+			ap.Value = tokens[ix].Value
+			ix++
+		}
+		p = ap
 	}
-	return afs, ix, nil
+	if !matchToken(tokens, ix, TokenRBracket) {
+		return nil, ix, fmt.Errorf("expected ], got %v", tokens[ix].Kind)
+	}
+	ix++
+	return p, ix, nil
 }
 
 func compileNodeQueryStep(tokens []*Token, ix int) (*NodeQueryStep, int, error) {
@@ -76,6 +81,21 @@ func compileNodeQueryStep(tokens []*Token, ix int) (*NodeQueryStep, int, error) 
 	}
 	nqs.name = tokens[ix].Value
 	ix++
+	var err error
+	for ix < len(tokens) && matchToken(tokens, ix, TokenLBracket) {
+		var p Predicate
+		p, ix, err = compilePredicate(tokens, ix)
+		if err != nil {
+			return nil, ix, err
+		}
+		if nqs.predicate == nil {
+			nqs.predicate = p
+		} else {
+			nqs.predicate = &AndPredicate{
+				predicates: []Predicate{nqs.predicate, p},
+			}
+		}
+	}
 	return nqs, ix, nil
 }
 
@@ -103,33 +123,6 @@ func compileQuery(tokens []*Token) (Query, error) {
 				return nil, err
 			}
 			query = append(query, nqs)
-		case TokenLBracket:
-			ix++
-			if matchToken(tokens, ix, TokenNumber) {
-				// Index query step
-				var iqs QueryStep
-				iqs, ix, err = compileIndexQueryStep(tokens, ix)
-				if err != nil {
-					return nil, err
-				}
-				query = append(query, iqs)
-			} else if matchToken(tokens, ix, TokenAt) {
-				// Attribute filter step
-				// Keep it duplicated becase at some point I want to
-				// unwrap AND-filter in a series of separate filters.
-				var afs QueryStep
-				afs, ix, err = compileAttrFilterStep(tokens, ix)
-				if err != nil {
-					return nil, err
-				}
-				query = append(query, afs)
-			} else {
-				return nil, fmt.Errorf("unexpected token %v", tokens[ix].Kind)
-			}
-			if !matchToken(tokens, ix, TokenRBracket) {
-				return nil, fmt.Errorf("expected ], got %v", tokens[ix].Kind)
-			}
-			ix++
 		default:
 			return nil, fmt.Errorf("unexpected token %v %q", tokens[ix].Kind, tokens[ix].Value)
 		}

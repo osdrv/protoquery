@@ -5,28 +5,6 @@ import (
 	"strings"
 )
 
-type AttrCmp int
-
-const (
-	AttrCmpExist AttrCmp = iota
-	AttrCmpEq
-	AttrCmpNe
-	AttrCmpGt
-	AttrCmpLt
-	AttrCmpGe
-	AttrCmpLe
-)
-
-var cmpToStr = map[AttrCmp]string{
-	AttrCmpExist: "",
-	AttrCmpEq:    "=",
-	AttrCmpNe:    "!=",
-	AttrCmpGt:    ">",
-	AttrCmpLt:    "<",
-	AttrCmpGe:    ">=",
-	AttrCmpLe:    "<=",
-}
-
 type QueryStepKind int
 
 const (
@@ -36,14 +14,7 @@ const (
 	IndexQueryStepKind
 	RootQueryStepKind
 	RecursiveDescentQueryStepKind
-	ParentQueryStepKind
 )
-
-type AttrPredicate struct {
-	Name  string
-	Value string
-	Cmp   AttrCmp
-}
 
 type Query []QueryStep
 
@@ -58,11 +29,22 @@ func (q Query) String() string {
 type QueryStep interface {
 	Name() string
 	Kind() QueryStepKind
-	Predicate() *AttrPredicate
+	Predicate() Predicate
+	IntValue() (int, error)
+}
+
+type defaultQueryStep struct{}
+
+func (qs *defaultQueryStep) Predicate() Predicate {
+	return allMatchPredicate
+}
+
+func (qs *defaultQueryStep) IntValue() (int, error) {
+	return 0, fmt.Errorf("Not an index query step")
 }
 
 type SelfQueryStep struct {
-	predicate *AttrPredicate
+	*defaultQueryStep
 }
 
 var _ QueryStep = (*SelfQueryStep)(nil)
@@ -75,12 +57,10 @@ func (qs *SelfQueryStep) Kind() QueryStepKind {
 	return SelfQueryStepKind
 }
 
-func (qs *SelfQueryStep) Predicate() *AttrPredicate {
-	return qs.predicate
-}
-
 type NodeQueryStep struct {
-	name string
+	*defaultQueryStep
+	name      string
+	predicate Predicate
 }
 
 var _ QueryStep = (*NodeQueryStep)(nil)
@@ -93,54 +73,15 @@ func (qs *NodeQueryStep) Kind() QueryStepKind {
 	return NodeQueryStepKind
 }
 
-func (qs *NodeQueryStep) Predicate() *AttrPredicate {
-	return nil
-}
-
-type AttrFilterStep struct {
-	predicate *AttrPredicate
-}
-
-var _ QueryStep = (*AttrFilterStep)(nil)
-
-func (qs *AttrFilterStep) Name() string {
-	var s strings.Builder
-	s.WriteString(fmt.Sprintf("[@%s", qs.predicate.Name))
-	if qs.predicate.Cmp != AttrCmpExist {
-		s.WriteString(fmt.Sprintf("%s%s", cmpToStr[qs.predicate.Cmp], qs.predicate.Value))
+func (qs *NodeQueryStep) Predicate() Predicate {
+	if qs.predicate == nil {
+		return allMatchPredicate
 	}
-	s.WriteString("]")
-	return s.String()
-}
-
-func (qs *AttrFilterStep) Kind() QueryStepKind {
-	return AttrFilterQueryStepKind
-}
-
-func (qs *AttrFilterStep) Predicate() *AttrPredicate {
 	return qs.predicate
 }
 
-type IndexQueryStep struct {
-	index int
-}
-
-var _ QueryStep = (*IndexQueryStep)(nil)
-
-func (qs *IndexQueryStep) Name() string {
-	return fmt.Sprintf("[%d]", qs.index)
-}
-
-func (qs *IndexQueryStep) Kind() QueryStepKind {
-	return IndexQueryStepKind
-}
-
-func (qs *IndexQueryStep) Predicate() *AttrPredicate {
-	return nil
-}
-
 type RootQueryStep struct {
-	predicate *AttrPredicate
+	*defaultQueryStep
 }
 
 var _ QueryStep = (*RootQueryStep)(nil)
@@ -153,11 +94,8 @@ func (qs *RootQueryStep) Kind() QueryStepKind {
 	return RootQueryStepKind
 }
 
-func (qs *RootQueryStep) Predicate() *AttrPredicate {
-	return qs.predicate
-}
-
 type RecursiveDescentQueryStep struct {
+	*defaultQueryStep
 }
 
 var _ QueryStep = (*RecursiveDescentQueryStep)(nil)
@@ -168,26 +106,4 @@ func (qs *RecursiveDescentQueryStep) Name() string {
 
 func (qs *RecursiveDescentQueryStep) Kind() QueryStepKind {
 	return RecursiveDescentQueryStepKind
-}
-
-func (qs *RecursiveDescentQueryStep) Predicate() *AttrPredicate {
-	return nil
-}
-
-type ParentQueryStep struct {
-	predicate *AttrPredicate
-}
-
-var _ QueryStep = (*ParentQueryStep)(nil)
-
-func (qs *ParentQueryStep) Name() string {
-	return ".."
-}
-
-func (qs *ParentQueryStep) Kind() QueryStepKind {
-	return ParentQueryStepKind
-}
-
-func (qs *ParentQueryStep) Predicate() *AttrPredicate {
-	return qs.predicate
 }

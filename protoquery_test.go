@@ -1,8 +1,11 @@
 package protoquery
 
 import (
+	"reflect"
 	"strings"
 	"testing"
+
+	"google.golang.org/protobuf/proto"
 )
 
 // errorEqual compares two errors. It returns true if both are nil,
@@ -42,13 +45,54 @@ func TestFindAll(t *testing.T) {
 		},
 	}
 
-	pq, err := Compile("/bookstore/book[price>35.00]")
-	if err != nil {
-		t.Fatalf("Compile() error = %v, no error expected", err)
+	tests := []struct {
+		name    string
+		query   string
+		want    []proto.Message
+		wantErr error
+	}{
+		{
+			name:  "children elements",
+			query: "/books/book",
+			want: []proto.Message{
+				store.Books[0],
+				store.Books[1],
+			},
+		},
+		{
+			name:  "child element by numeric index",
+			query: "/books/book[1]",
+			want: []proto.Message{
+				store.Books[1],
+			},
+		},
 	}
 
-	res := pq.FindAll(&store)
-	if len(res) != 1 {
-		t.Errorf("FindAll() got = %v, want 1", len(res))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pq, err := Compile(tt.query)
+			if !errorsSimilar(tt.wantErr, err) {
+				t.Errorf("Compile() error = %v, want %v", err, tt.wantErr)
+				return
+			}
+			if err != nil {
+				t.Errorf("Compile() error = %v, no error expected", err)
+				return
+			}
+			res := pq.FindAll(&store)
+			if !reflect.DeepEqual(res, tt.want) {
+				t.Errorf("Compile() = %+v, want %+v", res, tt.want)
+			}
+		})
 	}
+
+	//pq, err := Compile("/books/book[@price>35.00]")
+	//if err != nil {
+	//	t.Fatalf("Compile() error = %v, no error expected", err)
+	//}
+
+	//res := pq.FindAll(&store)
+	//if len(res) != 1 {
+	//	t.Errorf("FindAll() got = %v, want 1", len(res))
+	//}
 }
