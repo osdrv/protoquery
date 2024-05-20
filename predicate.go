@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"google.golang.org/protobuf/proto"
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 )
 
 type AttrCmp int
@@ -47,8 +48,24 @@ type AttrPredicate struct {
 var _ Predicate = (*AttrPredicate)(nil)
 
 func (ap *AttrPredicate) IsMatch(index int, msg proto.Message) bool {
-	// TODO(osdrv): implement me
-	return true
+	if msg == nil {
+		return false
+	}
+	field := msg.ProtoReflect().Descriptor().Fields().ByName(protoreflect.Name(ap.Name))
+	if field == nil {
+		return false
+	}
+	val := msg.ProtoReflect().Get(field)
+	switch ap.Cmp {
+	case AttrCmpExist:
+		return val.IsValid()
+	case AttrCmpEq:
+		return val.String() == ap.Value
+	case AttrCmpNe:
+		return val.String() != ap.Value
+	default:
+		panic("not implemented")
+	}
 }
 
 func (ap *AttrPredicate) String() string {

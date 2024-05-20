@@ -42,6 +42,10 @@ func TestFindAll(t *testing.T) {
 				Author: "Steve Klabnik",
 				Price:  39.99,
 			},
+			{
+				Title: "The Bible",
+				Price: 0.00,
+			},
 		},
 	}
 
@@ -57,6 +61,7 @@ func TestFindAll(t *testing.T) {
 			want: []proto.Message{
 				store.Books[0],
 				store.Books[1],
+				store.Books[2],
 			},
 		},
 		{
@@ -64,6 +69,21 @@ func TestFindAll(t *testing.T) {
 			query: "/books/book[1]",
 			want: []proto.Message{
 				store.Books[1],
+			},
+		},
+		{
+			name:  "child element by attribute presence",
+			query: "/books/book[@author]",
+			want: []proto.Message{
+				store.Books[0],
+				store.Books[1],
+			},
+		},
+		{
+			name:  "child element by attribute equality",
+			query: "/books/book[@author='Alan A. A. Donovan']",
+			want: []proto.Message{
+				store.Books[0],
 			},
 		},
 	}
