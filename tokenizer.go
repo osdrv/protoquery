@@ -65,6 +65,12 @@ func tokenizeXPathQuery(query string) ([]*Token, error) {
 			}
 			ix++
 			tokens = append(tokens, NewToken(query[start:ix], tk))
+		} else if match(query, ix, TokenBang) {
+			if !match(query, ix+1, TokenEqual) {
+				return nil, fmt.Errorf("expected !=, got %v", query[ix])
+			}
+			ix += 2
+			tokens = append(tokens, NewToken(query[start:ix], TokenNotEqual))
 		} else if match(query, ix, TokenDot) {
 			tk := TokenDot
 			if len(query) > ix && match(query, ix+1, TokenDot) {

@@ -1,7 +1,9 @@
 package protoquery
 
 import (
+	"cmp"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"google.golang.org/protobuf/proto"
@@ -47,6 +49,25 @@ type AttrPredicate struct {
 
 var _ Predicate = (*AttrPredicate)(nil)
 
+func compare[T cmp.Ordered](a, b T, cmp AttrCmp) bool {
+	switch cmp {
+	case AttrCmpEq:
+		return a == b
+	case AttrCmpNe:
+		return a != b
+	case AttrCmpGt:
+		return a > b
+	case AttrCmpLt:
+		return a < b
+	case AttrCmpGe:
+		return a >= b
+	case AttrCmpLe:
+		return a <= b
+	default:
+		panic("comparison operator not implemented")
+	}
+}
+
 func (ap *AttrPredicate) IsMatch(index int, msg proto.Message) bool {
 	if msg == nil {
 		return false
@@ -55,14 +76,34 @@ func (ap *AttrPredicate) IsMatch(index int, msg proto.Message) bool {
 	if field == nil {
 		return false
 	}
-	val := msg.ProtoReflect().Get(field)
 	switch ap.Cmp {
 	case AttrCmpExist:
-		return val.IsValid()
-	case AttrCmpEq:
-		return val.String() == ap.Value
-	case AttrCmpNe:
-		return val.String() != ap.Value
+		return msg.ProtoReflect().Has(field)
+	case AttrCmpEq, AttrCmpNe, AttrCmpGt, AttrCmpLt, AttrCmpGe, AttrCmpLe:
+		val := msg.ProtoReflect().Get(field)
+		switch field.Kind() {
+		case protoreflect.StringKind:
+			return compare(val.String(), ap.Value, ap.Cmp)
+		case protoreflect.FloatKind:
+			f, err := strconv.ParseFloat(ap.Value, 64)
+			if err != nil {
+				return false
+			}
+			return compare(val.Float(), f, ap.Cmp)
+		case protoreflect.Int32Kind,
+			protoreflect.Sint32Kind,
+			protoreflect.Sfixed32Kind,
+			protoreflect.Int64Kind,
+			protoreflect.Sint64Kind,
+			protoreflect.Sfixed64Kind:
+			i, err := strconv.ParseInt(ap.Value, 10, 64)
+			if err != nil {
+				return false
+			}
+			return compare(val.Int(), i, ap.Cmp)
+		default:
+			panic("unsupported match predicate type")
+		}
 	default:
 		panic("not implemented")
 	}

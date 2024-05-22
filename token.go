@@ -10,11 +10,12 @@ type TokenKind byte
 const (
 	TokenNone         TokenKind = iota
 	TokenAt           TokenKind = '@'
+	TokenBang         TokenKind = '!'
 	TokenDot          TokenKind = '.'
 	TokenDotDot       TokenKind = ':' // DotDot is a pseudo-token that represents a double dot.
 	TokenDoubleQuote  TokenKind = '"'
 	TokenEqual        TokenKind = '='
-	TokenNotEqual     TokenKind = '!'
+	TokenNotEqual     TokenKind = '!' // NotEqual is a pseudo-token that represents a not equal operator.
 	TokenGreater      TokenKind = '>'
 	TokenGreaterEqual TokenKind = 'G' // GreaterEqual is a pseudo-token that represents a greater than or equal operator.
 	TokenLBracket     TokenKind = '['

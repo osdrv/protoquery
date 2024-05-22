@@ -86,6 +86,21 @@ func TestFindAll(t *testing.T) {
 				store.Books[0],
 			},
 		},
+		{
+			name:  "child element by attribute inequality",
+			query: "/books/book[@author!='Alan A. A. Donovan']",
+			want: []proto.Message{
+				store.Books[1],
+				store.Books[2],
+			},
+		},
+		{
+			name:  "child element with a numeric attribute comparison",
+			query: "/books/book[@price>35]",
+			want: []proto.Message{
+				store.Books[1],
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -105,14 +120,4 @@ func TestFindAll(t *testing.T) {
 			}
 		})
 	}
-
-	//pq, err := Compile("/books/book[@price>35.00]")
-	//if err != nil {
-	//	t.Fatalf("Compile() error = %v, no error expected", err)
-	//}
-
-	//res := pq.FindAll(&store)
-	//if len(res) != 1 {
-	//	t.Errorf("FindAll() got = %v, want 1", len(res))
-	//}
 }

@@ -330,6 +330,22 @@ func TestTokenizeXPathQuery(t *testing.T) {
 				NewToken("]", TokenRBracket),
 			},
 		},
+		{
+			name:  "node with an attribute inequality",
+			input: "/bookstore/book[@price!=35.00]",
+			want: []*Token{
+				NewToken("/", TokenSlash),
+				NewToken("bookstore", TokenNode),
+				NewToken("/", TokenSlash),
+				NewToken("book", TokenNode),
+				NewToken("[", TokenLBracket),
+				NewToken("@", TokenAt),
+				NewToken("price", TokenNode),
+				NewToken("!=", TokenNotEqual),
+				NewToken("35.00", TokenNumber),
+				NewToken("]", TokenRBracket),
+			},
+		},
 	}
 
 	for _, tt := range tests {
