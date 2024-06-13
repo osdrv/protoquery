@@ -49,6 +49,8 @@ type AttrPredicate struct {
 
 var _ Predicate = (*AttrPredicate)(nil)
 
+// cmp.Ordered requires golang 1.21+.
+// see https://go.dev/blog/comparable for more details.
 func compare[T cmp.Ordered](a, b T, cmp AttrCmp) bool {
 	switch cmp {
 	case AttrCmpEq:
@@ -90,12 +92,9 @@ func (ap *AttrPredicate) IsMatch(index int, msg proto.Message) bool {
 				return false
 			}
 			return compare(val.Float(), f, ap.Cmp)
-		case protoreflect.Int32Kind,
-			protoreflect.Sint32Kind,
-			protoreflect.Sfixed32Kind,
-			protoreflect.Int64Kind,
-			protoreflect.Sint64Kind,
-			protoreflect.Sfixed64Kind:
+		case protoreflect.Int32Kind, protoreflect.Sint32Kind,
+			protoreflect.Sfixed32Kind, protoreflect.Int64Kind,
+			protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
 			i, err := strconv.ParseInt(ap.Value, 10, 64)
 			if err != nil {
 				return false
