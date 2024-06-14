@@ -1,8 +1,12 @@
 package protoquery
 
 import (
+	"bytes"
 	"fmt"
+	"strings"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
@@ -46,7 +50,9 @@ func (pq *ProtoQuery) FindAll(msg proto.Message) []interface{} {
 		head, queue = queue[0], queue[1:]
 		if head.qix > len(pq.query)-1 {
 			val := head.ptr.Interface()
-			// TODO(osdrv): I don't like this explicit branching. Need to figure out a better way.
+			// TODO(osdrv): this explicit branching is error-prone.
+			// I need to figure out a better way to discriminate between
+			// messages and scalars.
 			if _, ok := val.(protoreflect.Message); ok {
 				res = append(res, head.ptr.Message().Interface())
 			} else {
@@ -67,14 +73,13 @@ func (pq *ProtoQuery) FindAll(msg proto.Message) []interface{} {
 					list := head.ptr.Message().Get(field).List()
 					// If the next query step is an index, no need to populate all items
 					// in the queue, just the one at the index.
-					//
-					// TODO(osdrv): make sure that the field name matches the list item type.
-					// E.g.: if the path is /books/book, the item type should be "Book".
-					// Otherwise, it would be possible to type any kind of message in the
-					// query and it will match unconditionally.
 					for i := 0; i < list.Len(); i++ {
 						if pq.query[head.qix+1].Kind() == NodeQueryStepKind {
-							if !pq.query[head.qix+1].Predicate().IsMatch(i, list.Get(i).Message().Interface()) {
+							element := list.Get(i).Message().Interface()
+							if !nameMatches(element.ProtoReflect().Descriptor().Name(), pq.query[head.qix+1].Name()) {
+								continue
+							}
+							if !pq.query[head.qix+1].Predicate().IsMatch(i, element) {
 								continue
 							}
 						}
@@ -102,6 +107,19 @@ func (pq *ProtoQuery) FindAll(msg proto.Message) []interface{} {
 	}
 
 	return res
+}
+
+func snakeCase(s string) string {
+	var b bytes.Buffer
+	csr := cases.Title(language.English)
+	for _, ss := range strings.Split(s, "_") {
+		b.WriteString(csr.String(ss))
+	}
+	return b.String()
+}
+
+func nameMatches(name protoreflect.Name, query string) bool {
+	return string(name) == snakeCase(query)
 }
 
 func findOneOfByName(msg proto.Message, name string) (protoreflect.OneofDescriptor, bool) {

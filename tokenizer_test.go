@@ -346,6 +346,18 @@ func TestTokenizeXPathQuery(t *testing.T) {
 				NewToken("]", TokenRBracket),
 			},
 		},
+		{
+			name:  "node with underscore",
+			input: "/bookstore/book/some_attribute",
+			want: []*Token{
+				NewToken("/", TokenSlash),
+				NewToken("bookstore", TokenNode),
+				NewToken("/", TokenSlash),
+				NewToken("book", TokenNode),
+				NewToken("/", TokenSlash),
+				NewToken("some_attribute", TokenNode),
+			},
+		},
 	}
 
 	for _, tt := range tests {

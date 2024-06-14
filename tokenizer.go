@@ -3,7 +3,7 @@ package protoquery
 import "fmt"
 
 func isAlpha(s string, ix int) bool {
-	return ix < len(s) && (s[ix] >= 'a' && s[ix] <= 'z' || s[ix] >= 'A' && s[ix] <= 'Z')
+	return ix < len(s) && (s[ix] >= 'a' && s[ix] <= 'z' || s[ix] >= 'A' && s[ix] <= 'Z' || s[ix] == '_')
 }
 
 func isDigit(s string, ix int) bool {
