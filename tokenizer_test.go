@@ -1,7 +1,6 @@
 package protoquery
 
 import (
-	"reflect"
 	"testing"
 )
 
@@ -371,7 +370,7 @@ func TestTokenizeXPathQuery(t *testing.T) {
 				return
 			}
 
-			if !reflect.DeepEqual(tt.want, tokens) {
+			if !deepEqual(tt.want, tokens) {
 				t.Errorf("Unexpected result: want: %+v, got: %+v", tt.want, tokens)
 			}
 		})

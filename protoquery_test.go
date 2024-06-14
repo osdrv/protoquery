@@ -1,7 +1,6 @@
 package protoquery
 
 import (
-	"reflect"
 	"testing"
 )
 
@@ -39,6 +38,16 @@ func TestFindAllAttributeAccess(t *testing.T) {
 				"Steve Klabnik",
 			},
 		},
+		{
+			name:  "chile element with predicate",
+			query: "/books/book[@price>35]/price",
+			want:  []interface{}{39.99},
+		},
+		{
+			name:  "child element with an empty attribute value",
+			query: "/books/book[@title='The Bible']/author",
+			want:  []interface{}{""},
+		},
 	}
 
 	for _, tt := range tests {
@@ -53,7 +62,7 @@ func TestFindAllAttributeAccess(t *testing.T) {
 				return
 			}
 			res := pq.FindAll(&store)
-			if !reflect.DeepEqual(res, tt.want) {
+			if !deepEqual(res, tt.want) {
 				t.Errorf("Compile() = %+v, want %+v", res, tt.want)
 			}
 		})
@@ -151,7 +160,7 @@ func TestFindAllChilrenAccess(t *testing.T) {
 				return
 			}
 			res := pq.FindAll(&store)
-			if !reflect.DeepEqual(res, tt.want) {
+			if !deepEqual(res, tt.want) {
 				t.Errorf("Compile() = %+v, want %+v", res, tt.want)
 			}
 		})
