@@ -29,14 +29,22 @@ func Compile(q string) (*ProtoQuery, error) {
 	}, nil
 }
 
-func (pq *ProtoQuery) Find(root proto.Message) (proto.Message, error) {
-	panic("not implemented")
-}
+// func (pq *ProtoQuery) Find(root proto.Message) (proto.Message, error) {
+// 	panic("not implemented")
+// }
 
 // queueItem is an internal structure to keep track of the moving multi-head pointer.
 type queueItem struct {
 	qix int
 	ptr protoreflect.Value
+}
+
+func protoListToInterfaceList(pl protoreflect.List) interface{} {
+	list := make([]interface{}, 0, pl.Len())
+	for i := 0; i < pl.Len(); i++ {
+		list = append(list, pl.Get(i).Interface())
+	}
+	return list
 }
 
 func (pq *ProtoQuery) FindAll(msg proto.Message) []interface{} {
@@ -53,8 +61,11 @@ func (pq *ProtoQuery) FindAll(msg proto.Message) []interface{} {
 			// TODO(osdrv): this explicit branching is error-prone.
 			// I need to figure out a better way to discriminate between
 			// messages and scalars.
+			// TODO(osdrv): most likely, this is a good candidate for a interface-based switch.
 			if _, ok := val.(protoreflect.Message); ok {
 				res = append(res, head.ptr.Message().Interface())
+			} else if _, ok := val.(protoreflect.List); ok {
+				res = append(res, protoListToInterfaceList(head.ptr.List()))
 			} else {
 				res = append(res, val)
 			}
@@ -69,7 +80,11 @@ func (pq *ProtoQuery) FindAll(msg proto.Message) []interface{} {
 			})
 		case NodeQueryStepKind:
 			if field, ok := findFieldByName(head.ptr.Message().Interface(), qstep.Name()); ok {
-				if field.IsList() {
+				// NOTE(osdrv):
+				// This is an attempt of a local optimization.
+				// XPath path contains the name of the element and we're trying to jump straight to the next step.
+				// It won't make sense when this is the last step, hence we need to check the bounds.
+				if field.IsList() && head.qix < len(pq.query)-1 {
 					list := head.ptr.Message().Get(field).List()
 					// If the next query step is an index, no need to populate all items
 					// in the queue, just the one at the index.

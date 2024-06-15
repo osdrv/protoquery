@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package protoquery;
+option go_package = "osdrv/protoquery";
+
+message RepeatedScalarHolder {
+    repeated RepeatedScalarsItem items = 1;
+}
+
+message RepeatedScalarsItem {
+    repeated int32 int32s = 1;
+    repeated int64 int64s = 2;
+    repeated uint32 uint32s = 3;
+    repeated uint64 uint64s = 4;
+    repeated float floats = 5;
+    repeated string strings = 6;
+    repeated bool bools = 7;
+    bytes bytes = 8;
+}

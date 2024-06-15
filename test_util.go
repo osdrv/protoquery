@@ -32,6 +32,9 @@ func equalWithTolerance(a, b, tolerance float64) bool {
 
 func deepEqual[K any](a, b K) bool {
 	valA, valB := reflect.ValueOf(a), reflect.ValueOf(b)
+	if valA.Kind() != valB.Kind() {
+		return false
+	}
 	switch valA.Kind() {
 	case reflect.String, reflect.Bool,
 		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,

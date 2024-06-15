@@ -166,3 +166,121 @@ func TestFindAllChilrenAccess(t *testing.T) {
 		})
 	}
 }
+
+func TestFindAllRepeatedScalars(t *testing.T) {
+	holder := RepeatedScalarHolder{
+		Items: []*RepeatedScalarsItem{
+			{
+				Int32S:  []int32{1, 2, 3},
+				Int64S:  []int64{1, 2, 3},
+				Uint32S: []uint32{1, 2, 3},
+				Uint64S: []uint64{1, 2, 3},
+				Floats:  []float32{1.1, 2.2, 3.3},
+				Strings: []string{"a", "b", "c"},
+				Bools:   []bool{true, false},
+				Bytes:   []byte{1, 2, 3},
+			},
+		},
+	}
+
+	tests := []struct {
+		name  string
+		query string
+		want  []interface{}
+	}{
+		{
+			name:  "return int32 repeated attribute",
+			query: "/items/repeated_scalars_item/int32s",
+			want:  []interface{}{[]int32{1, 2, 3}},
+		},
+		{
+			name:  "return int64 repeated attribute",
+			query: "/items/repeated_scalars_item/int64s",
+			want:  []interface{}{[]int64{1, 2, 3}},
+		},
+		{
+			name:  "return uint32 repeated attribute",
+			query: "/items/repeated_scalars_item/uint32s",
+			want:  []interface{}{[]uint32{1, 2, 3}},
+		},
+		{
+			name:  "return uint64 repeated attribute",
+			query: "/items/repeated_scalars_item/uint64s",
+			want:  []interface{}{[]uint64{1, 2, 3}},
+		},
+		{
+			name:  "return float repeated attribute",
+			query: "/items/repeated_scalars_item/floats",
+			want:  []interface{}{[]float32{1.1, 2.2, 3.3}},
+		},
+		{
+			name:  "return string repeated attribute",
+			query: "/items/repeated_scalars_item/strings",
+			want:  []interface{}{[]string{"a", "b", "c"}},
+		},
+		{
+			name:  "return bools repeated attribute",
+			query: "/items/repeated_scalars_item/bools",
+			want:  []interface{}{[]bool{true, false}},
+		},
+		{
+			name:  "return bytes repeated attribute",
+			query: "/items/repeated_scalars_item/bytes",
+			want:  []interface{}{[]byte{1, 2, 3}},
+		},
+		{
+			name:  "return int32 individual attribute",
+			query: "/items/repeated_scalars_item/int32s[0]",
+			want:  []interface{}{int32(1)},
+		},
+		{
+			name:  "return int64 individual attribute",
+			query: "/items/repeated_scalars_item/int64s[0]",
+			want:  []interface{}{int64(1)},
+		},
+		{
+			name:  "return uint32 individual attribute",
+			query: "/items/repeated_scalars_item/uint32s[0]",
+			want:  []interface{}{uint32(1)},
+		},
+		{
+			name:  "return uint64 individual attribute",
+			query: "/items/repeated_scalars_item/uint64s[0]",
+			want:  []interface{}{uint64(1)},
+		},
+		{
+			name:  "return float individual attribute",
+			query: "/items/repeated_scalars_item/floats[0]",
+			want:  []interface{}{1.1},
+		},
+		{
+			name:  "return string individual attribute",
+			query: "/items/repeated_scalars_item/strings[0]",
+			want:  []interface{}{"a"},
+		},
+		{
+			name:  "return bools individual attribute",
+			query: "/items/repeated_scalars_item/bools[0]",
+			want:  []interface{}{true},
+		},
+		{
+			name:  "return bytes attribute",
+			query: "/items/repeated_scalars_item/bytes[0]",
+			want:  []interface{}{byte(1)},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pq, err := Compile(tt.query)
+			if err != nil {
+				t.Errorf("Compile() error = %v, no error expected", err)
+				return
+			}
+			res := pq.FindAll(&holder)
+			if !deepEqual(res, tt.want) {
+				t.Errorf("Compile() = %+v, want %+v", res, tt.want)
+			}
+		})
+	}
+}

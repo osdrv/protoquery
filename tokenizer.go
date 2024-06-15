@@ -20,7 +20,7 @@ func readNumber(s string, ix int) (string, int) {
 
 func readNode(s string, ix int) (string, int) {
 	start := ix
-	for ix < len(s) && isAlpha(s, ix) {
+	for ix < len(s) && (isAlpha(s, ix) || (ix-start > 0 && isDigit(s, ix))) {
 		ix++
 	}
 	return s[start:ix], ix

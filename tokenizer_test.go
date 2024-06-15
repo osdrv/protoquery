@@ -357,6 +357,18 @@ func TestTokenizeXPathQuery(t *testing.T) {
 				NewToken("some_attribute", TokenNode),
 			},
 		},
+		{
+			name:  "node with digits",
+			input: "/bookstore/book/int32",
+			want: []*Token{
+				NewToken("/", TokenSlash),
+				NewToken("bookstore", TokenNode),
+				NewToken("/", TokenSlash),
+				NewToken("book", TokenNode),
+				NewToken("/", TokenSlash),
+				NewToken("int32", TokenNode),
+			},
+		},
 	}
 
 	for _, tt := range tests {
