@@ -3,6 +3,8 @@ package protoquery
 import (
 	"fmt"
 	"strings"
+
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 type QueryStepKind int
@@ -21,26 +23,20 @@ type Query []QueryStep
 func (q Query) String() string {
 	var s strings.Builder
 	for _, step := range q {
-		s.WriteString(step.Name())
+		s.WriteString(step.String())
 	}
 	return s.String()
 }
 
 type QueryStep interface {
-	Name() string
 	Kind() QueryStepKind
-	Predicate() Predicate
-	IntValue() (int, error)
+	String() string
 }
 
 type defaultQueryStep struct{}
 
 func (qs *defaultQueryStep) Predicate() Predicate {
-	return allMatchPredicate
-}
-
-func (qs *defaultQueryStep) IntValue() (int, error) {
-	return 0, fmt.Errorf("Not an index query step")
+	return nil
 }
 
 type SelfQueryStep struct {
@@ -49,7 +45,7 @@ type SelfQueryStep struct {
 
 var _ QueryStep = (*SelfQueryStep)(nil)
 
-func (qs *SelfQueryStep) Name() string {
+func (qs *SelfQueryStep) String() string {
 	return "."
 }
 
@@ -59,25 +55,17 @@ func (qs *SelfQueryStep) Kind() QueryStepKind {
 
 type NodeQueryStep struct {
 	*defaultQueryStep
-	name      string
-	predicate Predicate
+	name string
 }
 
 var _ QueryStep = (*NodeQueryStep)(nil)
 
-func (qs *NodeQueryStep) Name() string {
+func (qs *NodeQueryStep) String() string {
 	return qs.name
 }
 
 func (qs *NodeQueryStep) Kind() QueryStepKind {
 	return NodeQueryStepKind
-}
-
-func (qs *NodeQueryStep) Predicate() Predicate {
-	if qs.predicate == nil {
-		return allMatchPredicate
-	}
-	return qs.predicate
 }
 
 type RootQueryStep struct {
@@ -86,7 +74,7 @@ type RootQueryStep struct {
 
 var _ QueryStep = (*RootQueryStep)(nil)
 
-func (qs *RootQueryStep) Name() string {
+func (qs *RootQueryStep) String() string {
 	return "/"
 }
 
@@ -100,10 +88,51 @@ type RecursiveDescentQueryStep struct {
 
 var _ QueryStep = (*RecursiveDescentQueryStep)(nil)
 
-func (qs *RecursiveDescentQueryStep) Name() string {
+func (qs *RecursiveDescentQueryStep) String() string {
 	return "//"
 }
 
 func (qs *RecursiveDescentQueryStep) Kind() QueryStepKind {
 	return RecursiveDescentQueryStepKind
+}
+
+type AttrFilterQueryStep struct {
+	*defaultQueryStep
+	predicate Predicate
+}
+
+var _ QueryStep = (*AttrFilterQueryStep)(nil)
+
+func (qs *AttrFilterQueryStep) Match(val protoreflect.Value) bool {
+	return qs.predicate.Match(val)
+}
+
+func (qs *AttrFilterQueryStep) String() string {
+	return "[@" + qs.predicate.String() + "]"
+}
+
+func (qs *AttrFilterQueryStep) Kind() QueryStepKind {
+	return AttrFilterQueryStepKind
+}
+
+type IndexQueryStep struct {
+	*defaultQueryStep
+	index int
+}
+
+var _ QueryStep = (*IndexQueryStep)(nil)
+
+func (qs *IndexQueryStep) GetElement(list protoreflect.List) (protoreflect.Value, bool) {
+	if list.IsValid() && qs.index < list.Len() {
+		return list.Get(qs.index), true
+	}
+	return protoreflect.Value{}, false
+}
+
+func (qs *IndexQueryStep) String() string {
+	return fmt.Sprintf("[%d]", qs.index)
+}
+
+func (qs *IndexQueryStep) Kind() QueryStepKind {
+	return IndexQueryStepKind
 }

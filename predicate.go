@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"google.golang.org/protobuf/proto"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -32,12 +31,10 @@ var (
 		AttrCmpGe:    ">=",
 		AttrCmpLe:    "<=",
 	}
-
-	allMatchPredicate = &AllMatchPredicate{}
 )
 
 type Predicate interface {
-	IsMatch(int, proto.Message) bool
+	Match(protoreflect.Value) bool
 	String() string
 }
 
@@ -70,19 +67,21 @@ func compare[T cmp.Ordered](a, b T, cmp AttrCmp) bool {
 	}
 }
 
-func (ap *AttrPredicate) IsMatch(index int, msg proto.Message) bool {
-	if msg == nil {
+func (ap *AttrPredicate) Match(val protoreflect.Value) bool {
+	if !val.IsValid() {
 		return false
 	}
-	field := msg.ProtoReflect().Descriptor().Fields().ByName(protoreflect.Name(ap.Name))
+
+	msg := val.Message()
+	field := msg.Descriptor().Fields().ByName(protoreflect.Name(ap.Name))
 	if field == nil {
 		return false
 	}
 	switch ap.Cmp {
 	case AttrCmpExist:
-		return msg.ProtoReflect().Has(field)
+		return msg.Has(field)
 	case AttrCmpEq, AttrCmpNe, AttrCmpGt, AttrCmpLt, AttrCmpGe, AttrCmpLe:
-		val := msg.ProtoReflect().Get(field)
+		val := msg.Get(field)
 		switch field.Kind() {
 		case protoreflect.StringKind:
 			return compare(val.String(), ap.Value, ap.Cmp)
@@ -110,99 +109,26 @@ func (ap *AttrPredicate) IsMatch(index int, msg proto.Message) bool {
 
 func (ap *AttrPredicate) String() string {
 	var s strings.Builder
-	s.WriteString(fmt.Sprintf("[@%s", ap.Name))
+	s.WriteString(ap.Name)
 	if ap.Cmp != AttrCmpExist {
-		s.WriteString(fmt.Sprintf("%s%s", cmpToStr[ap.Cmp], ap.Value))
+		s.WriteString(fmt.Sprintf("%s%q", cmpToStr[ap.Cmp], ap.Value))
 	}
-	s.WriteString("]")
 	return s.String()
 }
 
+// TODO(osdrv): I believe this should be gone. It is only used as an intermediate value
+// in the Compiler. I need a better way to discriminate between index and field predicates.
 type IndexPredicate struct {
 	Index int
 }
 
 var _ Predicate = (*IndexPredicate)(nil)
 
-func (ip *IndexPredicate) IsMatch(index int, msg proto.Message) bool {
-	return index == ip.Index
+func (ip *IndexPredicate) Match(protoreflect.Value) bool {
+	// stub method
+	return false
 }
 
 func (ip *IndexPredicate) String() string {
 	return fmt.Sprintf("[%d]", ip.Index)
-}
-
-type AllMatchPredicate struct{}
-
-var _ Predicate = (*AllMatchPredicate)(nil)
-
-func (ap *AllMatchPredicate) IsMatch(index int, msg proto.Message) bool {
-	return true
-}
-
-func (ap *AllMatchPredicate) String() string {
-	return "[*]"
-}
-
-type AndPredicate struct {
-	predicates []Predicate
-}
-
-var _ Predicate = (*AndPredicate)(nil)
-
-func (ap *AndPredicate) IsMatch(index int, msg proto.Message) bool {
-	for _, p := range ap.predicates {
-		if !p.IsMatch(index, msg) {
-			return false
-		}
-	}
-	return true
-}
-
-func (ap *AndPredicate) String() string {
-	var s strings.Builder
-	s.WriteString("[")
-	for i, p := range ap.predicates {
-		if i > 0 {
-			s.WriteString(" and ")
-		}
-		s.WriteString(p.String())
-	}
-	s.WriteString("]")
-	return s.String()
-}
-
-func (ap *AndPredicate) And(other Predicate) {
-	ap.predicates = append(ap.predicates, other)
-}
-
-type OrPredicate struct {
-	predicates []Predicate
-}
-
-var _ Predicate = (*OrPredicate)(nil)
-
-func (op *OrPredicate) IsMatch(index int, msg proto.Message) bool {
-	for _, p := range op.predicates {
-		if p.IsMatch(index, msg) {
-			return true
-		}
-	}
-	return false
-}
-
-func (op *OrPredicate) String() string {
-	var s strings.Builder
-	s.WriteString("[")
-	for i, p := range op.predicates {
-		if i > 0 {
-			s.WriteString(" or ")
-		}
-		s.WriteString(p.String())
-	}
-	return s.String()
-}
-
-func (op *OrPredicate) Or(other Predicate) {
-	op.predicates = append(op.predicates, other)
 }

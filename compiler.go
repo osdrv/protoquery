@@ -81,21 +81,6 @@ func compileNodeQueryStep(tokens []*Token, ix int) (*NodeQueryStep, int, error) 
 	}
 	nqs.name = tokens[ix].Value
 	ix++
-	var err error
-	for ix < len(tokens) && matchToken(tokens, ix, TokenLBracket) {
-		var p Predicate
-		p, ix, err = compilePredicate(tokens, ix)
-		if err != nil {
-			return nil, ix, err
-		}
-		if nqs.predicate == nil {
-			nqs.predicate = p
-		} else {
-			nqs.predicate = &AndPredicate{
-				predicates: []Predicate{nqs.predicate, p},
-			}
-		}
-	}
 	return nqs, ix, nil
 }
 
@@ -123,6 +108,24 @@ func compileQuery(tokens []*Token) (Query, error) {
 				return nil, err
 			}
 			query = append(query, nqs)
+		case TokenLBracket:
+			var err error
+			var p Predicate
+
+			p, ix, err = compilePredicate(tokens, ix)
+			if err != nil {
+				return nil, err
+			}
+			var step QueryStep
+			switch p.(type) {
+			case *AttrPredicate:
+				step = &AttrFilterQueryStep{predicate: p}
+			case *IndexPredicate:
+				step = &IndexQueryStep{index: p.(*IndexPredicate).Index}
+			default:
+				panic(fmt.Sprintf("Predicate type %T is not supported", p))
+			}
+			query = append(query, step)
 		default:
 			return nil, fmt.Errorf("unexpected token %v %q", tokens[ix].Kind, tokens[ix].Value)
 		}

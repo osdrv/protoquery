@@ -32,20 +32,20 @@ func TestFindAllAttributeAccess(t *testing.T) {
 	}{
 		{
 			name:  "child element attributes",
-			query: "/books/book[@author]/author",
+			query: "/books[@author]/author",
 			want: []interface{}{
 				"Alan A. A. Donovan",
 				"Steve Klabnik",
 			},
 		},
 		{
-			name:  "chile element with predicate",
-			query: "/books/book[@price>35]/price",
-			want:  []interface{}{39.99},
+			name:  "child element with predicate",
+			query: "/books[@price>35]/price",
+			want:  []interface{}{float32(39.99)},
 		},
 		{
 			name:  "child element with an empty attribute value",
-			query: "/books/book[@title='The Bible']/author",
+			query: "/books[@title='The Bible']/author",
 			want:  []interface{}{""},
 		},
 	}
@@ -97,7 +97,7 @@ func TestFindAllChilrenAccess(t *testing.T) {
 	}{
 		{
 			name:  "children elements",
-			query: "/books/book",
+			query: "/books",
 			want: []interface{}{
 				store.Books[0],
 				store.Books[1],
@@ -106,14 +106,14 @@ func TestFindAllChilrenAccess(t *testing.T) {
 		},
 		{
 			name:  "child element by numeric index",
-			query: "/books/book[1]",
+			query: "/books[1]",
 			want: []interface{}{
 				store.Books[1],
 			},
 		},
 		{
 			name:  "child element by attribute presence",
-			query: "/books/book[@author]",
+			query: "/books[@author]",
 			want: []interface{}{
 				store.Books[0],
 				store.Books[1],
@@ -121,14 +121,14 @@ func TestFindAllChilrenAccess(t *testing.T) {
 		},
 		{
 			name:  "child element by attribute equality",
-			query: "/books/book[@author='Alan A. A. Donovan']",
+			query: "/books[@author='Alan A. A. Donovan']",
 			want: []interface{}{
 				store.Books[0],
 			},
 		},
 		{
 			name:  "child element by attribute inequality",
-			query: "/books/book[@author!='Alan A. A. Donovan']",
+			query: "/books[@author!='Alan A. A. Donovan']",
 			want: []interface{}{
 				store.Books[1],
 				store.Books[2],
@@ -136,15 +136,10 @@ func TestFindAllChilrenAccess(t *testing.T) {
 		},
 		{
 			name:  "child element with a numeric attribute comparison",
-			query: "/books/book[@price>35]",
+			query: "/books[@price>35]",
 			want: []interface{}{
 				store.Books[1],
 			},
-		},
-		{
-			name:  "child element with a wrong name",
-			query: "/books/wrong_name[@price>35]",
-			want:  []interface{}{},
 		},
 	}
 
@@ -190,83 +185,86 @@ func TestFindAllRepeatedScalars(t *testing.T) {
 	}{
 		{
 			name:  "return int32 repeated attribute",
-			query: "/items/repeated_scalars_item/int32s",
-			want:  []interface{}{[]int32{1, 2, 3}},
+			query: "/items/int32s",
+			want:  []interface{}{int32(1), int32(2), int32(3)},
 		},
 		{
 			name:  "return int64 repeated attribute",
-			query: "/items/repeated_scalars_item/int64s",
-			want:  []interface{}{[]int64{1, 2, 3}},
+			query: "/items/int64s",
+			want:  []interface{}{int64(1), int64(2), int64(3)},
 		},
 		{
 			name:  "return uint32 repeated attribute",
-			query: "/items/repeated_scalars_item/uint32s",
-			want:  []interface{}{[]uint32{1, 2, 3}},
+			query: "/items/uint32s",
+			want:  []interface{}{uint32(1), uint32(2), uint32(3)},
 		},
 		{
 			name:  "return uint64 repeated attribute",
-			query: "/items/repeated_scalars_item/uint64s",
-			want:  []interface{}{[]uint64{1, 2, 3}},
+			query: "/items/uint64s",
+			want:  []interface{}{uint64(1), uint64(2), uint64(3)},
 		},
 		{
 			name:  "return float repeated attribute",
-			query: "/items/repeated_scalars_item/floats",
-			want:  []interface{}{[]float32{1.1, 2.2, 3.3}},
+			query: "/items/floats",
+			want:  []interface{}{float32(1.1), float32(2.2), float32(3.3)},
 		},
 		{
 			name:  "return string repeated attribute",
-			query: "/items/repeated_scalars_item/strings",
-			want:  []interface{}{[]string{"a", "b", "c"}},
+			query: "/items/strings",
+			want:  []interface{}{"a", "b", "c"},
 		},
 		{
 			name:  "return bools repeated attribute",
-			query: "/items/repeated_scalars_item/bools",
-			want:  []interface{}{[]bool{true, false}},
+			query: "/items/bools",
+			want:  []interface{}{true, false},
 		},
 		{
-			name:  "return bytes repeated attribute",
-			query: "/items/repeated_scalars_item/bytes",
+			name:  "return bytes attribute",
+			query: "/items/bytes",
 			want:  []interface{}{[]byte{1, 2, 3}},
 		},
 		{
 			name:  "return int32 individual attribute",
-			query: "/items/repeated_scalars_item/int32s[0]",
+			query: "/items/int32s[0]",
 			want:  []interface{}{int32(1)},
 		},
 		{
 			name:  "return int64 individual attribute",
-			query: "/items/repeated_scalars_item/int64s[0]",
+			query: "/items/int64s[0]",
 			want:  []interface{}{int64(1)},
 		},
 		{
 			name:  "return uint32 individual attribute",
-			query: "/items/repeated_scalars_item/uint32s[0]",
+			query: "/items/uint32s[0]",
 			want:  []interface{}{uint32(1)},
 		},
 		{
 			name:  "return uint64 individual attribute",
-			query: "/items/repeated_scalars_item/uint64s[0]",
+			query: "/items/uint64s[0]",
 			want:  []interface{}{uint64(1)},
 		},
 		{
 			name:  "return float individual attribute",
-			query: "/items/repeated_scalars_item/floats[0]",
-			want:  []interface{}{1.1},
+			query: "/items/floats[0]",
+			want:  []interface{}{float32(1.1)},
 		},
 		{
 			name:  "return string individual attribute",
-			query: "/items/repeated_scalars_item/strings[0]",
+			query: "/items/strings[0]",
 			want:  []interface{}{"a"},
 		},
 		{
 			name:  "return bools individual attribute",
-			query: "/items/repeated_scalars_item/bools[0]",
+			query: "/items/bools[0]",
 			want:  []interface{}{true},
 		},
 		{
 			name:  "return bytes attribute",
-			query: "/items/repeated_scalars_item/bytes[0]",
-			want:  []interface{}{byte(1)},
+			query: "/items/bytes[0]",
+			// This is a corner case. Protoreflect does not support ints with
+			// bitness less than 32. So, the bytes are converted to uint32.
+			// This must be documented.
+			want: []interface{}{uint32(1)},
 		},
 	}
 

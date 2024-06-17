@@ -1,12 +1,8 @@
 package protoquery
 
 import (
-	"bytes"
 	"fmt"
-	"strings"
 
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
@@ -29,117 +25,150 @@ func Compile(q string) (*ProtoQuery, error) {
 	}, nil
 }
 
-// func (pq *ProtoQuery) Find(root proto.Message) (proto.Message, error) {
-// 	panic("not implemented")
-// }
-
 // queueItem is an internal structure to keep track of the moving multi-head pointer.
 type queueItem struct {
 	qix int
 	ptr protoreflect.Value
 }
 
-func protoListToInterfaceList(pl protoreflect.List) interface{} {
-	list := make([]interface{}, 0, pl.Len())
-	for i := 0; i < pl.Len(); i++ {
-		list = append(list, pl.Get(i).Interface())
-	}
-	return list
+func debugf(format string, args ...interface{}) {
+	fmt.Printf(format+"\n", args...)
 }
 
-func (pq *ProtoQuery) FindAll(msg proto.Message) []interface{} {
-	res := []interface{}{}
-	if msg == nil {
-		return res
-	}
-	queue := []queueItem{{0, protoreflect.ValueOf(msg.ProtoReflect())}}
-	var head queueItem
-	for len(queue) > 0 {
-		head, queue = queue[0], queue[1:]
-		if head.qix > len(pq.query)-1 {
-			val := head.ptr.Interface()
-			// TODO(osdrv): this explicit branching is error-prone.
-			// I need to figure out a better way to discriminate between
-			// messages and scalars.
-			// TODO(osdrv): most likely, this is a good candidate for a interface-based switch.
-			if _, ok := val.(protoreflect.Message); ok {
-				res = append(res, head.ptr.Message().Interface())
-			} else if _, ok := val.(protoreflect.List); ok {
-				res = append(res, protoListToInterfaceList(head.ptr.List()))
-			} else {
-				res = append(res, val)
-			}
-			continue
-		}
-		qstep := pq.query[head.qix]
-		switch qstep.Kind() {
-		case RootQueryStepKind:
-			queue = append(queue, queueItem{
-				head.qix + 1,
-				head.ptr,
-			})
-		case NodeQueryStepKind:
-			if field, ok := findFieldByName(head.ptr.Message().Interface(), qstep.Name()); ok {
-				// NOTE(osdrv):
-				// This is an attempt of a local optimization.
-				// XPath path contains the name of the element and we're trying to jump straight to the next step.
-				// It won't make sense when this is the last step, hence we need to check the bounds.
-				if field.IsList() && head.qix < len(pq.query)-1 {
-					list := head.ptr.Message().Get(field).List()
-					// If the next query step is an index, no need to populate all items
-					// in the queue, just the one at the index.
-					for i := 0; i < list.Len(); i++ {
-						if pq.query[head.qix+1].Kind() == NodeQueryStepKind {
-							element := list.Get(i).Message().Interface()
-							if !nameMatches(element.ProtoReflect().Descriptor().Name(), pq.query[head.qix+1].Name()) {
-								continue
-							}
-							if !pq.query[head.qix+1].Predicate().IsMatch(i, element) {
-								continue
-							}
-						}
-						queue = append(queue, queueItem{
-							head.qix + 2,
-							list.Get(i),
-						})
-					}
-				} else {
-					nextfield := head.ptr.Message().Get(field)
-					nextval := protoreflect.ValueOf(nextfield.Interface())
-					queue = append(queue, queueItem{
-						head.qix + 1,
-						nextval,
-					})
-				}
-			} else if oneoff, ok := findOneOfByName(head.ptr.Message().Interface(), qstep.Name()); ok {
-				fmt.Printf("oneoff: %s", oneoff)
-			} else {
-				continue
-			}
-		default:
-			panic("not implemented")
-		}
-	}
+func panicf(format string, args ...interface{}) {
+	panic(fmt.Sprintf(format, args...))
+}
 
+func isList(val protoreflect.Value) bool {
+	if !val.IsValid() {
+		return false
+	}
+	_, ok := val.Interface().(protoreflect.List)
+	return ok
+}
+
+func isBytes(val protoreflect.Value) bool {
+	if !val.IsValid() {
+		return false
+	}
+	_, ok := val.Interface().([]byte)
+	return ok
+}
+
+func flatten(val protoreflect.Value) []interface{} {
+	res := []interface{}{}
+	switch val.Interface().(type) {
+	case protoreflect.Message:
+		res = append(res, val.Message().Interface())
+	case protoreflect.List:
+		list := val.List()
+		for i := 0; i < list.Len(); i++ {
+			res = append(res, flatten(list.Get(i))...)
+		}
+	default:
+		// giving up, returning the value as is
+		res = append(res, val.Interface())
+	}
 	return res
 }
 
-func snakeCase(s string) string {
-	var b bytes.Buffer
-	csr := cases.Title(language.English)
-	for _, ss := range strings.Split(s, "_") {
-		b.WriteString(csr.String(ss))
+func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
+	res := []interface{}{}
+	if root == nil {
+		return res
 	}
-	return b.String()
-}
-
-func nameMatches(name protoreflect.Name, query string) bool {
-	return string(name) == snakeCase(query)
-}
-
-func findOneOfByName(msg proto.Message, name string) (protoreflect.OneofDescriptor, bool) {
-	od := msg.ProtoReflect().Descriptor().Oneofs().ByName(protoreflect.Name(name))
-	return od, od != nil
+	queue := []queueItem{{
+		qix: 0,
+		ptr: protoreflect.ValueOf(root.ProtoReflect()),
+	}}
+	var head queueItem
+	for len(queue) > 0 {
+		head, queue = queue[0], queue[1:]
+		if head.qix >= len(pq.query) {
+			res = append(res, flatten(head.ptr)...)
+			continue
+		}
+		step := pq.query[head.qix]
+		switch step.Kind() {
+		case RootQueryStepKind:
+			debugf("Root step: %s", step)
+			queue = append(queue, queueItem{
+				qix: head.qix + 1,
+				ptr: head.ptr,
+			})
+		case NodeQueryStepKind:
+			debugf("Node step: %s", step)
+			cs := []protoreflect.Value{}
+			if isList(head.ptr) {
+				for i := 0; i < head.ptr.List().Len(); i++ {
+					cs = append(cs, head.ptr.List().Get(i))
+				}
+			} else {
+				cs = append(cs, head.ptr)
+			}
+			for _, c := range cs {
+				msg := c.Message()
+				field, ok := findFieldByName(msg.Interface(), step.(*NodeQueryStep).name)
+				if !ok {
+					continue
+				}
+				queue = append(queue, queueItem{
+					qix: head.qix + 1,
+					ptr: msg.Get(field),
+				})
+			}
+		case IndexQueryStepKind:
+			debugf("Index step: %s", step)
+			is := step.(*IndexQueryStep)
+			if !isList(head.ptr) {
+				debugf("Not a repeated field, trying to index it anyway")
+				if isBytes(head.ptr) {
+					debugf("Bytes field, trying to index it natively")
+					bytes := head.ptr.Bytes()
+					if is.index >= 0 && is.index < len(bytes) {
+						queue = append(queue, queueItem{
+							qix: head.qix + 1,
+							ptr: protoreflect.ValueOf(uint32(bytes[is.index])),
+						})
+					}
+				}
+				continue
+			}
+			list := head.ptr.List()
+			if val, ok := is.GetElement(list); ok {
+				queue = append(queue, queueItem{
+					qix: head.qix + 1,
+					ptr: val,
+				})
+			}
+		case AttrFilterQueryStepKind:
+			debugf("Attr step: %s", step)
+			match := []protoreflect.Value{}
+			afs := step.(*AttrFilterQueryStep)
+			if isList(head.ptr) {
+				for i := 0; i < head.ptr.List().Len(); i++ {
+					val := head.ptr.List().Get(i)
+					if afs.Match(val) {
+						match = append(match, val)
+					}
+				}
+			} else {
+				if afs.Match(head.ptr) {
+					match = append(match, head.ptr)
+				}
+			}
+			for _, val := range match {
+				queue = append(queue, queueItem{
+					qix: head.qix + 1,
+					ptr: val,
+				})
+			}
+		// TODO
+		default:
+			panicf("Query step kind %+v is not supported", step.Kind())
+		}
+	}
+	return res
 }
 
 func findFieldByName(msg proto.Message, name string) (protoreflect.FieldDescriptor, bool) {
