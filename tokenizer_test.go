@@ -57,6 +57,16 @@ func TestTokenizeXPathQuery(t *testing.T) {
 			want:  []*Token{NewToken("123.45", TokenNumber)},
 		},
 		{
+			name:  "bool true",
+			input: "True",
+			want:  []*Token{NewToken("True", TokenBool)},
+		},
+		{
+			name:  "bool false",
+			input: "FALSE",
+			want:  []*Token{NewToken("FALSE", TokenBool)},
+		},
+		{
 			name:  "root element",
 			input: "/root",
 			want: []*Token{

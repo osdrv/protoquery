@@ -2,7 +2,6 @@ package protoquery
 
 import (
 	"fmt"
-	"strconv"
 )
 
 func matchToken(tokens []*Token, ix int, kind TokenKind) bool {
@@ -91,7 +90,7 @@ func compileKeyOrAttrFilterQueryStep(tokens []*Token, ix int) (QueryStep, int, e
 		// I'll add length() and other expressions. Good enough for now as an intermediate step.
 		if num, err := tokens[ix].IntValue(); err == nil {
 			kqs.IsNum = true
-			kqs.Num = num
+			kqs.Num = int(num)
 		}
 		qs = kqs
 		ix++
@@ -150,8 +149,7 @@ func CompileExpression(tokens []*Token) (Expression, error) {
 }
 
 func compileLiteralExpression(tokens []*Token, ix int) (Expression, int, error) {
-	// TODO(osdrv): add support for booleans
-	if !matchTokenAny(tokens, ix, TokenString, TokenNumber) {
+	if !matchTokenAny(tokens, ix, TokenString, TokenNumber, TokenBool) {
 		return nil, ix, fmt.Errorf("expected string or number, got %v", tokens[ix].Kind)
 	}
 	srcv := tokens[ix].Value
@@ -162,13 +160,22 @@ func compileLiteralExpression(tokens []*Token, ix int) (Expression, int, error) 
 			typ:   TypeString,
 		}, ix + 1, nil
 	case TokenNumber:
-		intv, err := strconv.ParseInt(srcv, 10, 64)
+		intv, err := tokens[ix].IntValue()
 		if err != nil {
 			return nil, ix, err
 		}
 		return &Literal{
 			value: intv,
 			typ:   TypeNumber,
+		}, ix + 1, nil
+	case TokenBool:
+		boolv, err := tokens[ix].BoolValue()
+		if err != nil {
+			return nil, ix, err
+		}
+		return &Literal{
+			value: boolv,
+			typ:   TypeBool,
 		}, ix + 1, nil
 	default:
 		return nil, ix, fmt.Errorf("unexpected token %v %q", tokens[ix].Kind, tokens[ix].Value)

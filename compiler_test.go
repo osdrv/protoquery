@@ -197,6 +197,16 @@ func TestCompileExpression(t *testing.T) {
 				typ:   TypeString,
 			},
 		},
+		{
+			name: "boolean literal",
+			input: []*Token{
+				NewToken("true", TokenBool),
+			},
+			want: &Literal{
+				value: true,
+				typ:   TypeBool,
+			},
+		},
 	}
 
 	for _, tt := range tests {

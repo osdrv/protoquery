@@ -11,6 +11,7 @@ const (
 	TokenNone         TokenKind = iota
 	TokenAt           TokenKind = '@'
 	TokenBang         TokenKind = '!'
+	TokenBool         TokenKind = 'B' // Bool is a pseudo-token that represents a boolean.
 	TokenDot          TokenKind = '.'
 	TokenDotDot       TokenKind = ':' // DotDot is a pseudo-token that represents a double dot.
 	TokenDoubleQuote  TokenKind = '"'
@@ -53,7 +54,7 @@ func (t *Token) String() string {
 	}
 }
 
-func (t *Token) IntValue() (int, error) {
+func (t *Token) IntValue() (int64, error) {
 	if t.Kind != TokenNumber {
 		return 0, fmt.Errorf("Token is not a number: %v", t.Kind)
 	}
@@ -61,5 +62,12 @@ func (t *Token) IntValue() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return int(ix), nil
+	return ix, nil
+}
+
+func (t *Token) BoolValue() (bool, error) {
+	if t.Kind != TokenBool {
+		return false, fmt.Errorf("Token is not a boolean: %v", t.Kind)
+	}
+	return strconv.ParseBool(t.Value)
 }

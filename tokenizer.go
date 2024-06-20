@@ -1,6 +1,9 @@
 package protoquery
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 func isAlpha(s string, ix int) bool {
 	return ix < len(s) && (s[ix] >= 'a' && s[ix] <= 'z' || s[ix] >= 'A' && s[ix] <= 'Z' || s[ix] == '_')
@@ -100,7 +103,12 @@ func tokenizeXPathQuery(query string) ([]*Token, error) {
 		} else if isAlpha(query, ix) {
 			var node string
 			node, ix = readNode(query, ix)
-			tokens = append(tokens, NewToken(node, TokenNode))
+			lvalue := strings.ToLower(node)
+			if lvalue == "true" || lvalue == "false" {
+				tokens = append(tokens, NewToken(node, TokenBool))
+			} else {
+				tokens = append(tokens, NewToken(node, TokenNode))
+			}
 		} else if isDigit(query, ix) {
 			var number string
 			number, ix = readNumber(query, ix)
