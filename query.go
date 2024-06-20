@@ -14,6 +14,7 @@ const (
 	NodeQueryStepKind
 	AttrFilterQueryStepKind
 	IndexQueryStepKind
+	KeyQueryStepKind
 	RootQueryStepKind
 	RecursiveDescentQueryStepKind
 )
@@ -115,6 +116,7 @@ func (qs *AttrFilterQueryStep) Kind() QueryStepKind {
 	return AttrFilterQueryStepKind
 }
 
+// Deprecated: use KeyQueryStep instead.
 type IndexQueryStep struct {
 	*defaultQueryStep
 	index int
@@ -136,3 +138,27 @@ func (qs *IndexQueryStep) String() string {
 func (qs *IndexQueryStep) Kind() QueryStepKind {
 	return IndexQueryStepKind
 }
+
+type KeyQueryStep struct {
+	*defaultQueryStep
+	Term  string
+	IsNum bool
+	Num   int
+}
+
+var _ QueryStep = (*KeyQueryStep)(nil)
+
+func (qs *KeyQueryStep) String() string {
+	return "[" + qs.Term + "]"
+}
+
+func (qs *KeyQueryStep) Kind() QueryStepKind {
+	return KeyQueryStepKind
+}
+
+//func (qs *KeyQueryStep) GetElement(val protoreflect.Value) (protoreflect.Value, bool) {
+//	if list.IsValid() && qs.Num < list.Len() {
+//		return list.Get(qs.index), true
+//	}
+//	return protoreflect.Value{}, false
+//}

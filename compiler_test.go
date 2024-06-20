@@ -97,8 +97,10 @@ func TestCompileQuery(t *testing.T) {
 				&NodeQueryStep{
 					name: "nodename",
 				},
-				&IndexQueryStep{
-					index: 1,
+				&KeyQueryStep{
+					Term:  "1",
+					IsNum: true,
+					Num:   1,
 				},
 				&AttrFilterQueryStep{
 					predicate: &AttrPredicate{
@@ -163,6 +165,55 @@ func TestCompileQuery(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("compileQuery() = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCompileExpression(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   []*Token
+		want    Expression
+		wantErr error
+	}{
+		{
+			name: "numeric literal",
+			input: []*Token{
+				NewToken("123", TokenNumber),
+			},
+			want: &Literal{
+				value: int64(123),
+				typ:   TypeNumber,
+			},
+		},
+		{
+			name: "string literal",
+			input: []*Token{
+				NewToken("value", TokenString),
+			},
+			want: &Literal{
+				value: "value",
+				typ:   TypeString,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := CompileExpression(tt.input)
+			if tt.wantErr != nil {
+				if !errorsSimilar(err, tt.wantErr) {
+					t.Errorf("compileExpression() error = %v, wantErr %v", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("compileExpression() error = %v, no error expected", err)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("compileExpression() = %+v, want %+v", got, tt.want)
 			}
 		})
 	}

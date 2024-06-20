@@ -15,5 +15,6 @@ message RepeatedScalarsItem {
     repeated float floats = 5;
     repeated string strings = 6;
     repeated bool bools = 7;
+    // bytes is intentionally declared as non-repeated. It is a composite type that sup
     bytes bytes = 8;
 }

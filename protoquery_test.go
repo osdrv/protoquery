@@ -282,3 +282,43 @@ func TestFindAllRepeatedScalars(t *testing.T) {
 		})
 	}
 }
+
+func TestFindAllMaps(t *testing.T) {
+	messages := &MessageWithMapHolder{
+		MessagesWithMap: []*MessageWithMap{
+			{
+				StringStringMap: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name  string
+		query string
+		want  []interface{}
+	}{
+		{
+			name:  "string key lookup",
+			query: "/messages_with_map/string_string_map[key1]",
+			want:  []interface{}{"value1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pq, err := Compile(tt.query)
+			if err != nil {
+				t.Errorf("Compile() error = %v, no error expected", err)
+				return
+			}
+			res := pq.FindAll(messages)
+			if !deepEqual(res, tt.want) {
+				t.Errorf("Compile() = %+v, want %+v", res, tt.want)
+			}
+		})
+	}
+}

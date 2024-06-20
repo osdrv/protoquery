@@ -1,6 +1,9 @@
 package protoquery
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+)
 
 func matchToken(tokens []*Token, ix int, kind TokenKind) bool {
 	return ix < len(tokens) && tokens[ix].Kind == kind
@@ -27,50 +30,30 @@ var (
 )
 
 func compilePredicate(tokens []*Token, ix int) (Predicate, int, error) {
-	if !matchToken(tokens, ix, TokenLBracket) {
-		return nil, ix, fmt.Errorf("expected [, got %v", tokens[ix].Kind)
+	p := &AttrPredicate{}
+	if !matchToken(tokens, ix, TokenAt) {
+		return nil, ix, fmt.Errorf("expected @, got %v", tokens[ix].Kind)
 	}
 	ix++
-	var p Predicate
-	if matchToken(tokens, ix, TokenNumber) {
-		index, err := tokens[ix].IntValue()
-		if err != nil {
-			return nil, 0, err
-		}
-		p = &IndexPredicate{
-			Index: index,
-		}
-		ix++
-	} else {
-		ap := &AttrPredicate{}
-		if !matchToken(tokens, ix, TokenAt) {
-			return nil, ix, fmt.Errorf("expected @, got %v", tokens[ix].Kind)
-		}
-		ix++
-		if !matchToken(tokens, ix, TokenNode) {
-			return nil, ix, fmt.Errorf("expected attribute name, got %v", tokens[ix].Kind)
-		}
-		ap.Name = tokens[ix].Value
-		ap.Cmp = AttrCmpExist
-		ix++
+	if !matchToken(tokens, ix, TokenNode) {
+		return nil, ix, fmt.Errorf("expected attribute name, got %v", tokens[ix].Kind)
+	}
+	p.Name = tokens[ix].Value
+	p.Cmp = AttrCmpExist
+	ix++
 
-		if matchTokenAny(tokens, ix, TokenEqual, TokenGreater, TokenGreaterEqual,
-			TokenNotEqual, TokenLess, TokenLessEqual) {
-			ap.Cmp = tokenToCmp[tokens[ix].Kind]
-			ix++
-			if !matchTokenAny(tokens, ix, TokenString, TokenNumber) {
-				return nil, ix, fmt.Errorf("expected string or number, got %v", tokens[ix].Kind)
-			}
-			// TODO(osdrv): are we loosing the type information here?
-			ap.Value = tokens[ix].Value
-			ix++
+	if matchTokenAny(tokens, ix, TokenEqual, TokenGreater, TokenGreaterEqual,
+		TokenNotEqual, TokenLess, TokenLessEqual) {
+		p.Cmp = tokenToCmp[tokens[ix].Kind]
+		ix++
+		if !matchTokenAny(tokens, ix, TokenString, TokenNumber) {
+			return nil, ix, fmt.Errorf("expected string or number, got %v", tokens[ix].Kind)
 		}
-		p = ap
+		// TODO(osdrv): are we loosing the type information here?
+		p.Value = tokens[ix].Value
+		ix++
 	}
-	if !matchToken(tokens, ix, TokenRBracket) {
-		return nil, ix, fmt.Errorf("expected ], got %v", tokens[ix].Kind)
-	}
-	ix++
+
 	return p, ix, nil
 }
 
@@ -82,6 +65,44 @@ func compileNodeQueryStep(tokens []*Token, ix int) (*NodeQueryStep, int, error) 
 	nqs.name = tokens[ix].Value
 	ix++
 	return nqs, ix, nil
+}
+
+func compileKeyOrAttrFilterQueryStep(tokens []*Token, ix int) (QueryStep, int, error) {
+	if !matchToken(tokens, ix, TokenLBracket) {
+		return nil, ix, fmt.Errorf("expected [, got %v", tokens[ix].Kind)
+	}
+	ix++
+	var qs QueryStep
+
+	if matchToken(tokens, ix, TokenAt) {
+		// Read attribute filter
+		var p Predicate
+		var err error
+		p, ix, err = compilePredicate(tokens, ix)
+		if err != nil {
+			return nil, ix, err
+		}
+		qs = &AttrFilterQueryStep{predicate: p}
+	} else {
+		kqs := &KeyQueryStep{
+			Term: tokens[ix].Value,
+		}
+		// TODO(osdrv): this block of code would have to undergo another round of refactoring when
+		// I'll add length() and other expressions. Good enough for now as an intermediate step.
+		if num, err := tokens[ix].IntValue(); err == nil {
+			kqs.IsNum = true
+			kqs.Num = num
+		}
+		qs = kqs
+		ix++
+	}
+
+	if !matchToken(tokens, ix, TokenRBracket) {
+		return nil, ix, fmt.Errorf("expected ], got %v", tokens[ix].Kind)
+	}
+	ix++
+
+	return qs, ix, nil
 }
 
 func compileQuery(tokens []*Token) (Query, error) {
@@ -102,33 +123,54 @@ func compileQuery(tokens []*Token) (Query, error) {
 			query = append(query, &RecursiveDescentQueryStep{})
 			ix++
 		case TokenNode:
-			var nqs *NodeQueryStep
-			nqs, ix, err = compileNodeQueryStep(tokens, ix)
+			var qs *NodeQueryStep
+			qs, ix, err = compileNodeQueryStep(tokens, ix)
 			if err != nil {
 				return nil, err
 			}
-			query = append(query, nqs)
+			query = append(query, qs)
 		case TokenLBracket:
-			var err error
-			var p Predicate
-
-			p, ix, err = compilePredicate(tokens, ix)
+			var qs QueryStep
+			qs, ix, err = compileKeyOrAttrFilterQueryStep(tokens, ix)
 			if err != nil {
 				return nil, err
 			}
-			var step QueryStep
-			switch p.(type) {
-			case *AttrPredicate:
-				step = &AttrFilterQueryStep{predicate: p}
-			case *IndexPredicate:
-				step = &IndexQueryStep{index: p.(*IndexPredicate).Index}
-			default:
-				panic(fmt.Sprintf("Predicate type %T is not supported", p))
-			}
-			query = append(query, step)
+			query = append(query, qs)
 		default:
 			return nil, fmt.Errorf("unexpected token %v %q", tokens[ix].Kind, tokens[ix].Value)
 		}
 	}
 	return query, nil
+}
+
+func CompileExpression(tokens []*Token) (Expression, error) {
+	// TODO(osdrv): add support for more complex expressions
+	expr, _, err := compileLiteralExpression(tokens, 0)
+	return expr, err
+}
+
+func compileLiteralExpression(tokens []*Token, ix int) (Expression, int, error) {
+	// TODO(osdrv): add support for booleans
+	if !matchTokenAny(tokens, ix, TokenString, TokenNumber) {
+		return nil, ix, fmt.Errorf("expected string or number, got %v", tokens[ix].Kind)
+	}
+	srcv := tokens[ix].Value
+	switch tokens[ix].Kind {
+	case TokenString:
+		return &Literal{
+			value: srcv,
+			typ:   TypeString,
+		}, ix + 1, nil
+	case TokenNumber:
+		intv, err := strconv.ParseInt(srcv, 10, 64)
+		if err != nil {
+			return nil, ix, err
+		}
+		return &Literal{
+			value: intv,
+			typ:   TypeNumber,
+		}, ix + 1, nil
+	default:
+		return nil, ix, fmt.Errorf("unexpected token %v %q", tokens[ix].Kind, tokens[ix].Value)
+	}
 }

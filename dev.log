@@ -1,0 +1,84 @@
+2024-06-20 - Expression grammar
+
+Expressions could be of 3 types:
+* Boolean
+* String
+* Number(int64)
+
+The following grammar would be used to parse expressions:
+```
+boolean = "true" | "false"
+string = '"' [^"]* '"'
+number = [0-9]+
+identifier = [a-zA-Z_][a-zA-Z0-9_]*
+literal = boolean | string | number
+expression = literal | function_call | binary_expression | unary_expression
+function_call = identifier '(' [expression (',' expression)*] ')'
+binary_expression = expression binary_operator expression
+unary_expression = unary_operator expression
+binary_operator = "==" | "!=" | "<" | "<=" | ">" | ">=" | "&&" | "||" | "+" | "-" | "*" | "/"
+unary_operator = "!" | "-"
+```
+
+
+2024-06-18 - On KeyQueryStep and AttributeFilterQueryStep
+
+Key operator is the most complicated step in XPath.
+
+Syntax: `context[key_expression]`
+
+
+There are effectively 3 distinct kinds of keys:
+* Index keys.
+    * Evaluates to an integer.
+    * Resolves a list to a single element (or an empty set).
+    * Examples:
+        * "/foo[3]": 3rd element of foo.
+        * "/foo[last()]": last element of foo.
+        * "/foo[length() - 1]": another way to get the last element of foo.
+* Filter keys.
+    * Evaluates to a boolean.
+    * Filters a list to another list.
+    * Examples:
+        * "/foo[@bar>10]": elements of foo with bar > 10.
+        * "/foo[position() < 3]": first 2 elements of foo.
+        * "/foo[position() > 3]": elements of foo after the first 3.
+* Map keys.
+    * Evaluates to a primitive that would be coalesced to the map key type.
+    * Resolves a map to a single element (or an empty set).
+    * Examples:
+        * "/foo['baz']": map element of foo with a string key baz.
+        * "/foo[true]": map element of foo with boolean key true.
+        * "/foo[123 + 456]: map element of foo with a numeric key 579.
+
+The following rules apply:
+    * Filter keys are chainable.
+        * "/foo[@bar>10][position() < 3]" works as AND.
+    * Filter keys are element-contextual. The following operators are defined:
+        * `.`: current node.
+        * `..`: parent node.
+        * `@`: attribute prefix.
+        * `*`: any attribute.
+        * last(): last index of the list.
+        * position(): current index of the list element.
+    * Index keys are list-contextual. The following operations are defined:
+        * length(): length of the list.
+        * last(): last index of the list.
+        * position(): current index of the list element.
+    * Expressions can resolve to one of the following types:
+        * Boolean
+        * String
+        * Numeric
+
+Given the syntax, determining the specific type of a key is a challenge.
+In order to conclude the key kind, we use the evaluating expression type.
+
+The following algorithm would be applied:
+    * Numeric keys are either index or map keys.
+        * A numeric key expression would be evaluated regardless of the context and applied in the runtime.
+        * Functions last(), position() and length() are only defined for lists, hence won't be evaluated for the map.
+    * A boolean key expression is either a filter of a map key.
+        * Any context-dependant references and function calls would automatically cast the expression to a filter key.
+        * A statically evaluated boolean would be used as either a filter or a map key and applied in the runtime.
+    * Any other expression type resolves to a map key.
+        * In case the expression and the map entry key types are incompatible, the lookup silently terminates.

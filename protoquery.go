@@ -117,52 +117,31 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 					ptr: msg.Get(field),
 				})
 			}
-		case IndexQueryStepKind:
-			debugf("Index step: %s", step)
-			is := step.(*IndexQueryStep)
-			if !isList(head.ptr) {
-				debugf("Not a repeated field, trying to index it anyway")
-				if isBytes(head.ptr) {
-					debugf("Bytes field, trying to index it natively")
-					bytes := head.ptr.Bytes()
-					if is.index >= 0 && is.index < len(bytes) {
-						queue = append(queue, queueItem{
-							qix: head.qix + 1,
-							ptr: protoreflect.ValueOf(uint32(bytes[is.index])),
-						})
-					}
-				}
-				continue
-			}
-			list := head.ptr.List()
-			if val, ok := is.GetElement(list); ok {
-				queue = append(queue, queueItem{
-					qix: head.qix + 1,
-					ptr: val,
-				})
-			}
-		case AttrFilterQueryStepKind:
-			debugf("Attr step: %s", step)
-			match := []protoreflect.Value{}
-			afs := step.(*AttrFilterQueryStep)
-			if isList(head.ptr) {
-				for i := 0; i < head.ptr.List().Len(); i++ {
-					val := head.ptr.List().Get(i)
-					if afs.Match(val) {
-						match = append(match, val)
-					}
-				}
-			} else {
-				if afs.Match(head.ptr) {
-					match = append(match, head.ptr)
-				}
-			}
-			for _, val := range match {
-				queue = append(queue, queueItem{
-					qix: head.qix + 1,
-					ptr: val,
-				})
-			}
+		case KeyQueryStepKind:
+			debugf("Key step: %s", step)
+			panic("TODO(osdrv): not implemented")
+		//case AttrFilterQueryStepKind:
+		//	debugf("Attr step: %s", step)
+		//	match := []protoreflect.Value{}
+		//	afs := step.(*AttrFilterQueryStep)
+		//	if isList(head.ptr) {
+		//		for i := 0; i < head.ptr.List().Len(); i++ {
+		//			val := head.ptr.List().Get(i)
+		//			if afs.Match(val) {
+		//				match = append(match, val)
+		//			}
+		//		}
+		//	} else {
+		//		if afs.Match(head.ptr) {
+		//			match = append(match, head.ptr)
+		//		}
+		//	}
+		//	for _, val := range match {
+		//		queue = append(queue, queueItem{
+		//			qix: head.qix + 1,
+		//			ptr: val,
+		//		})
+		//	}
 		// TODO
 		default:
 			panicf("Query step kind %+v is not supported", step.Kind())
