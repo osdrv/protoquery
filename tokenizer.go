@@ -82,11 +82,26 @@ func tokenizeXPathQuery(query string) ([]*Token, error) {
 			}
 			ix++
 			tokens = append(tokens, NewToken(query[start:ix], tk))
+		} else if match(query, ix, TokenAnd) {
+			if !match(query, ix+1, TokenAnd) {
+				return nil, fmt.Errorf("expected &&, got %v", query[ix])
+			}
+			ix += 2
+			tokens = append(tokens, NewToken(query[start:ix], TokenAnd))
+		} else if match(query, ix, TokenPipe) {
+			if match(query, ix+1, TokenPipe) {
+				ix += 2
+				tokens = append(tokens, NewToken(query[start:ix], TokenOr))
+			} else {
+				ix += 1
+				tokens = append(tokens, NewToken(query[start:ix], TokenPipe))
+			}
 		} else if match(query, ix, TokenAt) {
 			ix++
 			tokens = append(tokens, NewToken(query[start:ix], TokenAt))
 		} else if matchAny(query, ix, TokenLBracket, TokenRBracket, TokenLParen,
-			TokenRParen, TokenStar, TokenEqual, TokenLess, TokenGreater, TokenMinus, TokenPipe) {
+			TokenRParen, TokenStar, TokenEqual, TokenLess, TokenGreater, TokenMinus,
+			TokenPlus) {
 			tokens = append(tokens, NewToken(query[ix:ix+1], TokenKind(query[ix])))
 			ix++
 		} else if matchAny(query, ix, TokenSingleQuote, TokenDoubleQuote) {

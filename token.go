@@ -9,9 +9,11 @@ type TokenKind byte
 
 const (
 	TokenNone         TokenKind = iota
+	TokenAnd          TokenKind = '&' // And is a pseudo-token that represents a logical AND operator.
 	TokenAt           TokenKind = '@'
 	TokenBang         TokenKind = '!'
 	TokenBool         TokenKind = 'B' // Bool is a pseudo-token that represents a boolean.
+	TokenComma        TokenKind = ','
 	TokenDot          TokenKind = '.'
 	TokenDotDot       TokenKind = ':' // DotDot is a pseudo-token that represents a double dot.
 	TokenDoubleQuote  TokenKind = '"'
@@ -26,7 +28,9 @@ const (
 	TokenMinus        TokenKind = '-'
 	TokenNode         TokenKind = 'N' // Node is a pseudo-token that represents a node.
 	TokenNumber       TokenKind = '0' // Number is a pseudo-token that represents a number.
+	TokenOr           TokenKind = 'O' // Or is a pseudo-token that represents a logical OR operator.
 	TokenPipe         TokenKind = '|'
+	TokenPlus         TokenKind = '+'
 	TokenRBracket     TokenKind = ']'
 	TokenRParen       TokenKind = ')'
 	TokenSingleQuote  TokenKind = '\''

@@ -35,7 +35,7 @@ func compilePredicate(tokens []*Token, ix int) (Predicate, int, error) {
 	}
 	ix++
 	if !matchToken(tokens, ix, TokenNode) {
-		return nil, ix, fmt.Errorf("expected attribute name, got %v", tokens[ix].Kind)
+		return nil, ix, fmt.Errorf("expected attribute name, got %v", tokens[ix].Value)
 	}
 	p.Name = tokens[ix].Value
 	p.Cmp = AttrCmpExist
@@ -46,7 +46,7 @@ func compilePredicate(tokens []*Token, ix int) (Predicate, int, error) {
 		p.Cmp = tokenToCmp[tokens[ix].Kind]
 		ix++
 		if !matchTokenAny(tokens, ix, TokenString, TokenNumber) {
-			return nil, ix, fmt.Errorf("expected string or number, got %v", tokens[ix].Kind)
+			return nil, ix, fmt.Errorf("expected string or number, got %v", tokens[ix].Value)
 		}
 		// TODO(osdrv): are we loosing the type information here?
 		p.Value = tokens[ix].Value
@@ -59,7 +59,7 @@ func compilePredicate(tokens []*Token, ix int) (Predicate, int, error) {
 func compileNodeQueryStep(tokens []*Token, ix int) (*NodeQueryStep, int, error) {
 	nqs := &NodeQueryStep{}
 	if !matchToken(tokens, ix, TokenNode) {
-		return nil, ix, fmt.Errorf("expected node name, got %v", tokens[ix].Kind)
+		return nil, ix, fmt.Errorf("expected node name, got %v", tokens[ix].Value)
 	}
 	nqs.name = tokens[ix].Value
 	ix++
@@ -68,7 +68,7 @@ func compileNodeQueryStep(tokens []*Token, ix int) (*NodeQueryStep, int, error) 
 
 func compileKeyOrAttrFilterQueryStep(tokens []*Token, ix int) (QueryStep, int, error) {
 	if !matchToken(tokens, ix, TokenLBracket) {
-		return nil, ix, fmt.Errorf("expected [, got %v", tokens[ix].Kind)
+		return nil, ix, fmt.Errorf("expected [, got %v", tokens[ix].Value)
 	}
 	ix++
 	var qs QueryStep
@@ -97,7 +97,7 @@ func compileKeyOrAttrFilterQueryStep(tokens []*Token, ix int) (QueryStep, int, e
 	}
 
 	if !matchToken(tokens, ix, TokenRBracket) {
-		return nil, ix, fmt.Errorf("expected ], got %v", tokens[ix].Kind)
+		return nil, ix, fmt.Errorf("expected ], got %v", tokens[ix].Value)
 	}
 	ix++
 
@@ -142,42 +142,259 @@ func compileQuery(tokens []*Token) (Query, error) {
 	return query, nil
 }
 
+// ===== Everything above this line is garbage =====
+
 func CompileExpression(tokens []*Token) (Expression, error) {
-	// TODO(osdrv): add support for more complex expressions
-	expr, _, err := compileLiteralExpression(tokens, 0)
+	expr, _, err := compileComparisonExpression(tokens, 0)
 	return expr, err
+}
+
+var (
+	tokenToOp = map[TokenKind]Operator{
+		TokenPlus:         OpPlus,
+		TokenMinus:        OpMinus,
+		TokenAnd:          OpAnd,
+		TokenOr:           OpOr,
+		TokenStar:         OpMul,
+		TokenSlash:        OpDiv,
+		TokenEqual:        OpEq,
+		TokenNotEqual:     OpNe,
+		TokenLess:         OpLt,
+		TokenLessEqual:    OpLe,
+		TokenGreater:      OpLt,
+		TokenGreaterEqual: OpLe,
+	}
+)
+
+func compileComparisonExpression(tokens []*Token, ix int) (Expression, int, error) {
+	var err error
+	var expr Expression
+	expr, ix, err = compileAdditionExpression(tokens, ix)
+	if err != nil {
+		return nil, ix, err
+	}
+	for matchTokenAny(tokens, ix, TokenEqual, TokenNotEqual, TokenLess, TokenLessEqual, TokenGreater, TokenGreaterEqual) {
+		op, ok := tokenToOp[tokens[ix].Kind]
+		if !ok {
+			return nil, ix, fmt.Errorf("unexpected comparison token %v", tokens[ix].Value)
+		}
+		ix++
+		var right Expression
+		right, ix, err = compileAdditionExpression(tokens, ix)
+		if err != nil {
+			return nil, ix, err
+		}
+		expr = &BinaryExpr{
+			left:  expr,
+			right: right,
+			op:    op,
+		}
+	}
+	return expr, ix, nil
+}
+
+func compileAdditionExpression(tokens []*Token, ix int) (Expression, int, error) {
+	var err error
+	var expr Expression
+	expr, ix, err = compileMultiplyExpression(tokens, ix)
+	if err != nil {
+		return nil, ix, err
+	}
+	for matchTokenAny(tokens, ix, TokenPlus, TokenMinus, TokenAnd, TokenOr) {
+		op, ok := tokenToOp[tokens[ix].Kind]
+		if !ok {
+			return nil, ix, fmt.Errorf("unexpected addition token %v", tokens[ix].Value)
+		}
+		ix++
+		var right Expression
+		right, ix, err = compileMultiplyExpression(tokens, ix)
+		if err != nil {
+			return nil, ix, err
+		}
+		expr = &BinaryExpr{
+			left:  expr,
+			right: right,
+			op:    op,
+		}
+	}
+	return expr, ix, nil
+}
+
+func compileMultiplyExpression(tokens []*Token, ix int) (Expression, int, error) {
+	var err error
+	var expr Expression
+	expr, ix, err = compileElementaryExpression(tokens, ix)
+	if err != nil {
+		return nil, ix, err
+	}
+	for matchTokenAny(tokens, ix, TokenStar, TokenSlash) {
+		op, ok := tokenToOp[tokens[ix].Kind]
+		if !ok {
+			return nil, ix, fmt.Errorf("unexpected multiply token %v", tokens[ix].Value)
+		}
+		ix++
+		var right Expression
+		right, ix, err = compileElementaryExpression(tokens, ix)
+		if err != nil {
+			return nil, ix, err
+		}
+		expr = &BinaryExpr{
+			left:  expr,
+			right: right,
+			op:    op,
+		}
+	}
+	return expr, ix, nil
+}
+
+func compileElementaryExpression(tokens []*Token, ix int) (Expression, int, error) {
+	var expr Expression
+	var err error
+	switch tokens[ix].Kind {
+	case TokenAt:
+		expr, ix, err = compilePropertyExpression(tokens, ix)
+	case TokenNode:
+		expr, ix, err = compileFunctionCallExpression(tokens, ix)
+	case TokenBang, TokenPlus, TokenMinus:
+		expr, ix, err = compileUnaryExpression(tokens, ix)
+	case TokenNumber, TokenBool, TokenString:
+		expr, ix, err = compileLiteralExpression(tokens, ix)
+	case TokenLParen:
+		ix++
+		expr, ix, err = compileComparisonExpression(tokens, ix)
+		if err != nil {
+			return nil, ix, err
+		}
+		if !matchToken(tokens, ix, TokenRParen) {
+			return nil, ix, fmt.Errorf("expected ')', got %v", tokens[ix].Value)
+		}
+		ix++
+	default:
+		return nil, ix, fmt.Errorf("unexpected token %v", tokens[ix].Value)
+	}
+
+	return expr, ix, err
 }
 
 func compileLiteralExpression(tokens []*Token, ix int) (Expression, int, error) {
 	if !matchTokenAny(tokens, ix, TokenString, TokenNumber, TokenBool) {
-		return nil, ix, fmt.Errorf("expected string or number, got %v", tokens[ix].Kind)
+		return nil, ix, fmt.Errorf("expected string or number, got %v", tokens[ix].Value)
 	}
-	srcv := tokens[ix].Value
+	var val any
+	val = tokens[ix].Value
+	typ := TypeString
 	switch tokens[ix].Kind {
 	case TokenString:
-		return &Literal{
-			value: srcv,
-			typ:   TypeString,
-		}, ix + 1, nil
 	case TokenNumber:
 		intv, err := tokens[ix].IntValue()
 		if err != nil {
 			return nil, ix, err
 		}
-		return &Literal{
-			value: intv,
-			typ:   TypeNumber,
-		}, ix + 1, nil
+		val = intv
+		typ = TypeNumber
 	case TokenBool:
 		boolv, err := tokens[ix].BoolValue()
 		if err != nil {
 			return nil, ix, err
 		}
-		return &Literal{
-			value: boolv,
-			typ:   TypeBool,
-		}, ix + 1, nil
+		val = boolv
+		typ = TypeBool
 	default:
 		return nil, ix, fmt.Errorf("unexpected token %v %q", tokens[ix].Kind, tokens[ix].Value)
 	}
+	return &LiteralExpr{
+		value: val,
+		typ:   typ,
+	}, ix + 1, nil
 }
+
+func compilePropertyExpression(tokens []*Token, ix int) (Expression, int, error) {
+	if !matchToken(tokens, ix, TokenAt) {
+		return nil, ix, fmt.Errorf("expected @, got %v", tokens[ix].Value)
+	}
+	ix++
+	if !matchTokenAny(tokens, ix, TokenNode, TokenStar) {
+		return nil, ix, fmt.Errorf("expected attribute name, got %v", tokens[ix].Value)
+	}
+	return &PropertyExpr{
+		name: tokens[ix].Value,
+	}, ix + 1, nil
+}
+
+func compileFunctionCallExpression(tokens []*Token, ix int) (Expression, int, error) {
+	if !matchToken(tokens, ix, TokenNode) {
+		return nil, ix, fmt.Errorf("expected function name, got %v", tokens[ix].Value)
+	}
+	name := tokens[ix].Value
+	ix++
+	if !matchToken(tokens, ix, TokenLParen) {
+		return nil, ix, fmt.Errorf("expected (, got %v", tokens[ix].Value)
+	}
+	ix++
+	var args []Expression
+	for ix < len(tokens) {
+		if matchToken(tokens, ix, TokenRParen) {
+			break
+		}
+		var arg Expression
+		var err error
+		arg, ix, err = compileComparisonExpression(tokens, ix)
+		if err != nil {
+			return nil, ix, err
+		}
+		args = append(args, arg)
+		if !matchToken(tokens, ix, TokenComma) {
+			break
+		}
+		ix++
+	}
+	if !matchToken(tokens, ix, TokenRParen) {
+		return nil, ix, fmt.Errorf("expected ), got %v", tokens[ix].Value)
+	}
+	return &FunctionCallExpr{
+		handle: name,
+		args:   args,
+	}, ix + 1, nil
+}
+
+func compileUnaryExpression(tokens []*Token, ix int) (Expression, int, error) {
+	var op Operator
+	switch tokens[ix].Kind {
+	case TokenBang:
+		op = OpNot
+	case TokenPlus:
+		op = OpPlus
+	case TokenMinus:
+		op = OpMinus
+	default:
+		return nil, ix, fmt.Errorf("unexpected token %v %q", tokens[ix].Kind, tokens[ix].Value)
+	}
+	ix++
+	var expr Expression
+	var err error
+	expr, ix, err = compileElementaryExpression(tokens, ix)
+	if err != nil {
+		return nil, ix, err
+	}
+	return &UnaryExpr{
+		op:   op,
+		expr: expr,
+	}, ix, nil
+}
+
+var (
+	BinaryOperators = map[TokenKind]Operator{
+		TokenEqual:        OpEq,
+		TokenNotEqual:     OpNe,
+		TokenLess:         OpLt,
+		TokenLessEqual:    OpLe,
+		TokenGreater:      OpGt,
+		TokenGreaterEqual: OpGe,
+		TokenAnd:          OpAnd,
+		TokenOr:           OpOr,
+		TokenPlus:         OpPlus,
+		TokenMinus:        OpMinus,
+		TokenStar:         OpMul,
+		TokenSlash:        OpDiv,
+	}
+)

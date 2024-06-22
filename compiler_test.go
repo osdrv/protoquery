@@ -182,7 +182,7 @@ func TestCompileExpression(t *testing.T) {
 			input: []*Token{
 				NewToken("123", TokenNumber),
 			},
-			want: &Literal{
+			want: &LiteralExpr{
 				value: int64(123),
 				typ:   TypeNumber,
 			},
@@ -192,7 +192,7 @@ func TestCompileExpression(t *testing.T) {
 			input: []*Token{
 				NewToken("value", TokenString),
 			},
-			want: &Literal{
+			want: &LiteralExpr{
 				value: "value",
 				typ:   TypeString,
 			},
@@ -202,9 +202,311 @@ func TestCompileExpression(t *testing.T) {
 			input: []*Token{
 				NewToken("true", TokenBool),
 			},
-			want: &Literal{
+			want: &LiteralExpr{
 				value: true,
 				typ:   TypeBool,
+			},
+		},
+		{
+			name: "named property",
+			input: []*Token{
+				NewToken("@", TokenAt),
+				NewToken("prop", TokenNode),
+			},
+			want: &PropertyExpr{
+				name: "prop",
+			},
+		},
+		{
+			name: "wildcard property",
+			input: []*Token{
+				NewToken("@", TokenAt),
+				NewToken("*", TokenStar),
+			},
+			want: &PropertyExpr{
+				name: "*",
+			},
+		},
+		{
+			name: "basic function call",
+			input: []*Token{
+				NewToken("func", TokenNode),
+				NewToken("(", TokenLParen),
+				NewToken(")", TokenRParen),
+			},
+			want: &FunctionCallExpr{
+				handle: "func",
+			},
+		},
+		{
+			name: "function call with arguments",
+			input: []*Token{
+				NewToken("func", TokenNode),
+				NewToken("(", TokenLParen),
+				NewToken("42", TokenNumber),
+				NewToken(",", TokenComma),
+				NewToken("@", TokenAt),
+				NewToken("prop", TokenNode),
+				NewToken(",", TokenComma),
+				NewToken("true", TokenBool),
+				NewToken(",", TokenComma),
+				NewToken("another_func", TokenNode),
+				NewToken("(", TokenLParen),
+				NewToken(")", TokenRParen),
+				NewToken(")", TokenRParen),
+			},
+			want: &FunctionCallExpr{
+				handle: "func",
+				args: []Expression{
+					&LiteralExpr{
+						value: int64(42),
+						typ:   TypeNumber,
+					},
+					&PropertyExpr{
+						name: "prop",
+					},
+					&LiteralExpr{
+						value: true,
+						typ:   TypeBool,
+					},
+					&FunctionCallExpr{
+						handle: "another_func",
+					},
+				},
+			},
+		},
+		{
+			name: "bool unary expr",
+			input: []*Token{
+				NewToken("!", TokenBang),
+				NewToken("@", TokenAt),
+				NewToken("bool_prop", TokenNode),
+			},
+			want: &UnaryExpr{
+				expr: &PropertyExpr{
+					name: "bool_prop",
+				},
+				op: OpNot,
+			},
+		},
+		{
+			name: "unary plus expr",
+			input: []*Token{
+				NewToken("+", TokenPlus),
+				NewToken("42", TokenNumber),
+			},
+			want: &UnaryExpr{
+				expr: &LiteralExpr{
+					value: int64(42),
+					typ:   TypeNumber,
+				},
+				op: OpPlus,
+			},
+		},
+		{
+			name: "unary minus expr",
+			input: []*Token{
+				NewToken("-", TokenMinus),
+				NewToken("42", TokenNumber),
+			},
+			want: &UnaryExpr{
+				expr: &LiteralExpr{
+					value: int64(42),
+					typ:   TypeNumber,
+				},
+				op: OpMinus,
+			},
+		},
+		{
+			name: "binary expr with 2 literals",
+			input: []*Token{
+				NewToken("42", TokenNumber),
+				NewToken("+", TokenPlus),
+				NewToken("24", TokenNumber),
+			},
+			want: &BinaryExpr{
+				left: &LiteralExpr{
+					value: int64(42),
+					typ:   TypeNumber,
+				},
+				right: &LiteralExpr{
+					value: int64(24),
+					typ:   TypeNumber,
+				},
+				op: OpPlus,
+			},
+		},
+		{
+			name: "binary with operator precedence",
+			input: []*Token{
+				NewToken("42", TokenNumber),
+				NewToken("+", TokenPlus),
+				NewToken("24", TokenNumber),
+				NewToken("*", TokenStar),
+				NewToken("2", TokenNumber),
+			},
+			want: &BinaryExpr{
+				left: &LiteralExpr{
+					value: int64(42),
+					typ:   TypeNumber,
+				},
+				right: &BinaryExpr{
+					left: &LiteralExpr{
+						value: int64(24),
+						typ:   TypeNumber,
+					},
+					right: &LiteralExpr{
+						value: int64(2),
+						typ:   TypeNumber,
+					},
+					op: OpMul,
+				},
+				op: OpPlus,
+			},
+		},
+		{
+			name: "binary with parentheses",
+			input: []*Token{
+				NewToken("(", TokenLParen),
+				NewToken("42", TokenNumber),
+				NewToken("+", TokenPlus),
+				NewToken("24", TokenNumber),
+				NewToken(")", TokenRParen),
+				NewToken("*", TokenStar),
+				NewToken("2", TokenNumber),
+			},
+			want: &BinaryExpr{
+				left: &BinaryExpr{
+					left: &LiteralExpr{
+						value: int64(42),
+						typ:   TypeNumber,
+					},
+					right: &LiteralExpr{
+						value: int64(24),
+						typ:   TypeNumber,
+					},
+					op: OpPlus,
+				},
+				right: &LiteralExpr{
+					value: int64(2),
+					typ:   TypeNumber,
+				},
+				op: OpMul,
+			},
+		},
+		{
+			name: "comparison expression with precedence",
+			input: []*Token{
+				NewToken("42", TokenNumber),
+				NewToken("<=", TokenLessEqual),
+				NewToken("24", TokenNumber),
+				NewToken("+", TokenPlus),
+				NewToken("2", TokenNumber),
+			},
+			want: &BinaryExpr{
+				left: &LiteralExpr{
+					value: int64(42),
+					typ:   TypeNumber,
+				},
+				right: &BinaryExpr{
+					left: &LiteralExpr{
+						value: int64(24),
+						typ:   TypeNumber,
+					},
+					right: &LiteralExpr{
+						value: int64(2),
+						typ:   TypeNumber,
+					},
+					op: OpPlus,
+				},
+				op: OpLe,
+			},
+		},
+		{
+			name: "binary unary with parenteses",
+			input: []*Token{
+				NewToken("!", TokenBang),
+				NewToken("(", TokenLParen),
+				NewToken("true", TokenBool),
+				NewToken("&&", TokenAnd),
+				NewToken("false", TokenBool),
+				NewToken(")", TokenRParen),
+			},
+			want: &UnaryExpr{
+				expr: &BinaryExpr{
+					left: &LiteralExpr{
+						value: true,
+						typ:   TypeBool,
+					},
+					right: &LiteralExpr{
+						value: false,
+						typ:   TypeBool,
+					},
+					op: OpAnd,
+				},
+				op: OpNot,
+			},
+		},
+		{
+			name: "unary operation with property",
+			input: []*Token{
+				NewToken("-", TokenMinus),
+				NewToken("@", TokenAt),
+				NewToken("prop", TokenNode),
+			},
+			want: &UnaryExpr{
+				expr: &PropertyExpr{
+					name: "prop",
+				},
+				op: OpMinus,
+			},
+		},
+		{
+			name: "binary and unary expressions with precedence",
+			input: []*Token{
+				NewToken("!", TokenBang),
+				NewToken("true", TokenBool),
+				NewToken("&&", TokenAnd),
+				NewToken("false", TokenBool),
+			},
+			want: &BinaryExpr{
+				left: &UnaryExpr{
+					expr: &LiteralExpr{
+						value: true,
+						typ:   TypeBool,
+					},
+					op: OpNot,
+				},
+				right: &LiteralExpr{
+					value: false,
+					typ:   TypeBool,
+				},
+				op: OpAnd,
+			},
+		},
+		{
+			name: "binary and unary expressions with precedence with parentheses",
+			input: []*Token{
+				NewToken("!", TokenBang),
+				NewToken("(", TokenLParen),
+				NewToken("true", TokenBool),
+				NewToken("&&", TokenAnd),
+				NewToken("false", TokenBool),
+				NewToken(")", TokenRParen),
+			},
+			want: &UnaryExpr{
+				expr: &BinaryExpr{
+					left: &LiteralExpr{
+						value: true,
+						typ:   TypeBool,
+					},
+					right: &LiteralExpr{
+						value: false,
+						typ:   TypeBool,
+					},
+					op: OpAnd,
+				},
+				op: OpNot,
 			},
 		},
 	}
