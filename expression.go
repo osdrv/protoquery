@@ -2,6 +2,7 @@ package protoquery
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -67,13 +68,11 @@ var (
 
 type EvalContext struct {
 	This any
-	kv   map[string]any
 }
 
 func NewEvalContext(this any) *EvalContext {
 	return &EvalContext{
 		This: this,
-		kv:   make(map[string]any),
 	}
 }
 
@@ -98,6 +97,20 @@ func NewLiteralExpr(value any, typ Type) *LiteralExpr {
 var _ Expression = (*LiteralExpr)(nil)
 
 func (l *LiteralExpr) Eval(*EvalContext) (any, error) {
+	switch l.typ {
+	case TypeBool:
+		return l.value.(bool), nil
+	case TypeString:
+		return l.value.(string), nil
+	case TypeNumber:
+		intv, err := toInt64(l.value)
+		if err != nil {
+			return nil, err
+		}
+		return intv, nil
+	default:
+		return nil, fmt.Errorf("Unknown type %v", l.typ)
+	}
 	return l.value, nil
 }
 
@@ -132,7 +145,7 @@ func (p *PropertyExpr) Eval(ctx *EvalContext) (any, error) {
 		return nil, fmt.Errorf("Invalid context %T, want: protoreflect.Message", ctx)
 	}
 	fd := msg.Descriptor().Fields().ByName(protoreflect.Name(p.name))
-	if msg.Has(fd) {
+	if fd != nil && msg.Has(fd) {
 		return msg.Get(fd).Interface(), nil
 	}
 	return nil, PropNotSet
@@ -217,7 +230,11 @@ func (u *UnaryExpr) Eval(ctx *EvalContext) (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		return f * v.(int64), nil
+		intv, err := toInt64(v)
+		if err != nil {
+			return nil, err
+		}
+		return f * intv, nil
 	case OpNot:
 		if u.expr.Type(ctx) != TypeBool {
 			return nil, fmt.Errorf("Invalid type %v for ! operator", u.expr.Type(ctx))
@@ -362,4 +379,8 @@ func boolBinEval(ctx *EvalContext, a, b Expression, op Operator) (any, error) {
 	default:
 		return nil, fmt.Errorf("Invalid operator %v", op)
 	}
+}
+
+func toInt64(v any) (int64, error) {
+	return reflect.ValueOf(v).Int(), nil
 }
