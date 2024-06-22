@@ -285,7 +285,7 @@ func (b *BinaryExpr) Eval(ctx *EvalContext) (any, error) {
 		return nil, fmt.Errorf("Type mismatch(%v Vs %v)", lt, rt)
 	}
 	switch b.op {
-	case OpPlus:
+	case OpEq, OpNe:
 		switch lt {
 		case TypeNumber:
 			return numericBinEval(ctx, b.left, b.right, b.op)
@@ -295,6 +295,15 @@ func (b *BinaryExpr) Eval(ctx *EvalContext) (any, error) {
 			return boolBinEval(ctx, b.left, b.right, b.op)
 		default:
 			return nil, fmt.Errorf("Invalid type %v for + operator", lt)
+		}
+	case OpPlus, OpLt, OpLe, OpGt, OpGe:
+		switch lt {
+		case TypeNumber:
+			return numericBinEval(ctx, b.left, b.right, b.op)
+		case TypeString:
+			return stringBinEval(ctx, b.left, b.right, b.op)
+		default:
+			return nil, fmt.Errorf("Invalid type %v for %v operator", lt, b.op)
 		}
 	case OpMinus, OpDiv, OpMul:
 		return numericBinEval(ctx, b.left, b.right, b.op)
@@ -334,6 +343,18 @@ func numericBinEval(ctx *EvalContext, a, b Expression, op Operator) (any, error)
 		return av.(int64) * bv.(int64), nil
 	case OpDiv:
 		return av.(int64) / bv.(int64), nil
+	case OpEq:
+		return av.(int64) == bv.(int64), nil
+	case OpNe:
+		return av.(int64) != bv.(int64), nil
+	case OpLt:
+		return av.(int64) < bv.(int64), nil
+	case OpLe:
+		return av.(int64) <= bv.(int64), nil
+	case OpGt:
+		return av.(int64) > bv.(int64), nil
+	case OpGe:
+		return av.(int64) >= bv.(int64), nil
 	default:
 		return nil, fmt.Errorf("Invalid operator %v", op)
 	}
@@ -354,6 +375,18 @@ func stringBinEval(ctx *EvalContext, a, b Expression, op Operator) (any, error) 
 	switch op {
 	case OpPlus:
 		return av.(string) + bv.(string), nil
+	case OpEq:
+		return av.(string) == bv.(string), nil
+	case OpNe:
+		return av.(string) != bv.(string), nil
+	case OpLt:
+		return av.(string) < bv.(string), nil
+	case OpLe:
+		return av.(string) <= bv.(string), nil
+	case OpGt:
+		return av.(string) > bv.(string), nil
+	case OpGe:
+		return av.(string) >= bv.(string), nil
 	default:
 		return nil, fmt.Errorf("Invalid operator %v", op)
 	}
@@ -376,6 +409,10 @@ func boolBinEval(ctx *EvalContext, a, b Expression, op Operator) (any, error) {
 		return av.(bool) && bv.(bool), nil
 	case OpOr:
 		return av.(bool) || bv.(bool), nil
+	case OpEq:
+		return av.(bool) == bv.(bool), nil
+	case OpNe:
+		return av.(bool) != bv.(bool), nil
 	default:
 		return nil, fmt.Errorf("Invalid operator %v", op)
 	}

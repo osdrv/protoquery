@@ -1,6 +1,7 @@
 package protoquery
 
 import (
+	"errors"
 	"testing"
 )
 
@@ -165,6 +166,196 @@ func TestExpressionEval(t *testing.T) {
 			},
 			ctx:  NewEvalContext(nil),
 			want: true,
+		},
+		{
+			name: "binary bool expression =",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr(true, TypeBool),
+				right: NewLiteralExpr(false, TypeBool),
+				op:    OpEq,
+			},
+			ctx:  NewEvalContext(nil),
+			want: false,
+		},
+		{
+			name: "binary bool expression !=",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr(true, TypeBool),
+				right: NewLiteralExpr(false, TypeBool),
+				op:    OpNe,
+			},
+			ctx:  NewEvalContext(nil),
+			want: true,
+		},
+		{
+			name: "binary bool expression !=",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr(true, TypeBool),
+				right: NewLiteralExpr(false, TypeBool),
+				op:    OpNe,
+			},
+			ctx:  NewEvalContext(nil),
+			want: true,
+		},
+		{
+			name: "binary numeric expression =",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr(1, TypeNumber),
+				right: NewLiteralExpr(2, TypeNumber),
+				op:    OpEq,
+			},
+			ctx:  NewEvalContext(nil),
+			want: false,
+		},
+		{
+			name: "binary numeric expression !=",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr(1, TypeNumber),
+				right: NewLiteralExpr(2, TypeNumber),
+				op:    OpNe,
+			},
+			ctx:  NewEvalContext(nil),
+			want: true,
+		},
+		{
+			name: "binary numeric expression >",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr(1, TypeNumber),
+				right: NewLiteralExpr(2, TypeNumber),
+				op:    OpGt,
+			},
+			ctx:  NewEvalContext(nil),
+			want: false,
+		},
+		{
+			name: "binary numeric expression >=",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr(1, TypeNumber),
+				right: NewLiteralExpr(2, TypeNumber),
+				op:    OpGe,
+			},
+			ctx:  NewEvalContext(nil),
+			want: false,
+		},
+		{
+			name: "binary numeric expression <",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr(1, TypeNumber),
+				right: NewLiteralExpr(2, TypeNumber),
+				op:    OpLt,
+			},
+			ctx:  NewEvalContext(nil),
+			want: true,
+		},
+		{
+			name: "binary numeric expression <=",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr(1, TypeNumber),
+				right: NewLiteralExpr(2, TypeNumber),
+				op:    OpLt,
+			},
+			ctx:  NewEvalContext(nil),
+			want: true,
+		},
+		{
+			name: "binary string expression unequal =",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr("foo", TypeString),
+				right: NewLiteralExpr("bar", TypeString),
+				op:    OpEq,
+			},
+			ctx:  NewEvalContext(nil),
+			want: false,
+		},
+		{
+			name: "binary string expression unequal !=",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr("foo", TypeString),
+				right: NewLiteralExpr("bar", TypeString),
+				op:    OpNe,
+			},
+			ctx:  NewEvalContext(nil),
+			want: true,
+		},
+		{
+			name: "binary string expression equal =",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr("foo", TypeString),
+				right: NewLiteralExpr("foo", TypeString),
+				op:    OpEq,
+			},
+			ctx:  NewEvalContext(nil),
+			want: true,
+		},
+		{
+			name: "binary string expression >",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr("foo", TypeString),
+				right: NewLiteralExpr("bar", TypeString),
+				op:    OpGt,
+			},
+			ctx:  NewEvalContext(nil),
+			want: true,
+		},
+		{
+			name: "binary string expression >=",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr("foo", TypeString),
+				right: NewLiteralExpr("bar", TypeString),
+				op:    OpGe,
+			},
+			ctx:  NewEvalContext(nil),
+			want: true,
+		},
+		{
+			name: "binary string expression <",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr("foo", TypeString),
+				right: NewLiteralExpr("bar", TypeString),
+				op:    OpLt,
+			},
+			ctx:  NewEvalContext(nil),
+			want: false,
+		},
+		{
+			name: "binary string expression <=",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr("foo", TypeString),
+				right: NewLiteralExpr("bar", TypeString),
+				op:    OpLe,
+			},
+			ctx:  NewEvalContext(nil),
+			want: false,
+		},
+		{
+			name: "binary string expression -",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr("foo", TypeString),
+				right: NewLiteralExpr("bar", TypeString),
+				op:    OpMinus,
+			},
+			ctx:     NewEvalContext(nil),
+			wantErr: errors.New("Invalid type"),
+		},
+		{
+			name: "binary string expression *",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr("foo", TypeString),
+				right: NewLiteralExpr("bar", TypeString),
+				op:    OpMul,
+			},
+			ctx:     NewEvalContext(nil),
+			wantErr: errors.New("Invalid type"),
+		},
+		{
+			name: "binary string expression /",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr("foo", TypeString),
+				right: NewLiteralExpr("bar", TypeString),
+				op:    OpDiv,
+			},
+			ctx:     NewEvalContext(nil),
+			wantErr: errors.New("Invalid type"),
 		},
 	}
 
