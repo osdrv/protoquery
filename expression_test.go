@@ -5,6 +5,93 @@ import (
 	"testing"
 )
 
+func TestExpressionType(t *testing.T) {
+	msg := &Book{
+		Title:  "The Go Programming Language",
+		Author: "Alan A. A. Donovan",
+		Price:  42.99,
+		Pages:  432,
+		OnSale: true,
+	}
+	debugf("msg: %v", msg)
+	tests := []struct {
+		name    string
+		input   Expression
+		ctx     *EvalContext
+		want    Type
+		wantErr error
+	}{
+		{
+			name:  "literal with string type",
+			input: NewLiteralExpr("hello", TypeString),
+			ctx:   NewEvalContext(nil),
+			want:  TypeString,
+		},
+		{
+			name:  "literal with integer type",
+			input: NewLiteralExpr(42, TypeInt),
+			ctx:   NewEvalContext(nil),
+			want:  TypeInt,
+		},
+		{
+			name:  "literal with float type",
+			input: NewLiteralExpr(42.99, TypeFloat),
+			ctx:   NewEvalContext(nil),
+			want:  TypeFloat,
+		},
+		{
+			name:  "literal with bool type",
+			input: NewLiteralExpr(true, TypeBool),
+			ctx:   NewEvalContext(nil),
+			want:  TypeBool,
+		},
+		{
+			name: "property with string type",
+			input: &PropertyExpr{
+				name: "author",
+			},
+			ctx:  NewEvalContext(msg.ProtoReflect()),
+			want: TypeString,
+		},
+		{
+			name: "property with number type",
+			input: &PropertyExpr{
+				name: "pages",
+			},
+			ctx:  NewEvalContext(msg.ProtoReflect()),
+			want: TypeInt,
+		},
+		{
+			name: "property with bool type",
+			input: &PropertyExpr{
+				name: "on_sale",
+			},
+			ctx:  NewEvalContext(msg.ProtoReflect()),
+			want: TypeBool,
+		},
+		{
+			name: "property with float type",
+			input: &PropertyExpr{
+				name: "price",
+			},
+			ctx:  NewEvalContext(msg.ProtoReflect()),
+			want: TypeFloat,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.input.Type(tt.ctx)
+			if !errorsSimilar(err, tt.wantErr) {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("unexpected type: got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestExpressionEval(t *testing.T) {
 	msg := &Book{
 		Title:  "The Go Programming Language",
@@ -20,8 +107,8 @@ func TestExpressionEval(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name:  "literal number",
-			input: NewLiteralExpr(42, TypeNumber),
+			name:  "literal integer",
+			input: NewLiteralExpr(42, TypeInt),
 			ctx:   NewEvalContext(nil),
 			want:  int64(42),
 		},
@@ -36,6 +123,12 @@ func TestExpressionEval(t *testing.T) {
 			input: NewLiteralExpr(true, TypeBool),
 			ctx:   NewEvalContext(nil),
 			want:  true,
+		},
+		{
+			name:  "literal float",
+			input: NewLiteralExpr(42.99, TypeFloat),
+			ctx:   NewEvalContext(nil),
+			want:  float64(42.99),
 		},
 		{
 			name: "property string",
@@ -82,7 +175,7 @@ func TestExpressionEval(t *testing.T) {
 		{
 			name: "unary numeric expression -42",
 			input: &UnaryExpr{
-				expr: NewLiteralExpr(42, TypeNumber),
+				expr: NewLiteralExpr(42, TypeInt),
 				op:   OpMinus,
 			},
 			ctx:  NewEvalContext(nil),
@@ -91,7 +184,7 @@ func TestExpressionEval(t *testing.T) {
 		{
 			name: "unary numeric expression +42",
 			input: &UnaryExpr{
-				expr: NewLiteralExpr(42, TypeNumber),
+				expr: NewLiteralExpr(42, TypeInt),
 				op:   OpPlus,
 			},
 			ctx:  NewEvalContext(nil),
@@ -100,8 +193,8 @@ func TestExpressionEval(t *testing.T) {
 		{
 			name: "binary numeric expression +",
 			input: &BinaryExpr{
-				left:  NewLiteralExpr(40, TypeNumber),
-				right: NewLiteralExpr(2, TypeNumber),
+				left:  NewLiteralExpr(40, TypeInt),
+				right: NewLiteralExpr(2, TypeInt),
 				op:    OpPlus,
 			},
 			ctx:  NewEvalContext(nil),
@@ -110,8 +203,8 @@ func TestExpressionEval(t *testing.T) {
 		{
 			name: "binary numeric expression *",
 			input: &BinaryExpr{
-				left:  NewLiteralExpr(40, TypeNumber),
-				right: NewLiteralExpr(2, TypeNumber),
+				left:  NewLiteralExpr(40, TypeInt),
+				right: NewLiteralExpr(2, TypeInt),
 				op:    OpMul,
 			},
 			ctx:  NewEvalContext(nil),
@@ -120,8 +213,8 @@ func TestExpressionEval(t *testing.T) {
 		{
 			name: "binary numeric expression -",
 			input: &BinaryExpr{
-				left:  NewLiteralExpr(40, TypeNumber),
-				right: NewLiteralExpr(2, TypeNumber),
+				left:  NewLiteralExpr(40, TypeInt),
+				right: NewLiteralExpr(2, TypeInt),
 				op:    OpMinus,
 			},
 			ctx:  NewEvalContext(nil),
@@ -130,8 +223,8 @@ func TestExpressionEval(t *testing.T) {
 		{
 			name: "binary numeric expression /",
 			input: &BinaryExpr{
-				left:  NewLiteralExpr(40, TypeNumber),
-				right: NewLiteralExpr(2, TypeNumber),
+				left:  NewLiteralExpr(40, TypeInt),
+				right: NewLiteralExpr(2, TypeInt),
 				op:    OpDiv,
 			},
 			ctx:  NewEvalContext(nil),
@@ -200,8 +293,8 @@ func TestExpressionEval(t *testing.T) {
 		{
 			name: "binary numeric expression =",
 			input: &BinaryExpr{
-				left:  NewLiteralExpr(1, TypeNumber),
-				right: NewLiteralExpr(2, TypeNumber),
+				left:  NewLiteralExpr(1, TypeInt),
+				right: NewLiteralExpr(2, TypeInt),
 				op:    OpEq,
 			},
 			ctx:  NewEvalContext(nil),
@@ -210,8 +303,8 @@ func TestExpressionEval(t *testing.T) {
 		{
 			name: "binary numeric expression !=",
 			input: &BinaryExpr{
-				left:  NewLiteralExpr(1, TypeNumber),
-				right: NewLiteralExpr(2, TypeNumber),
+				left:  NewLiteralExpr(1, TypeInt),
+				right: NewLiteralExpr(2, TypeInt),
 				op:    OpNe,
 			},
 			ctx:  NewEvalContext(nil),
@@ -220,8 +313,8 @@ func TestExpressionEval(t *testing.T) {
 		{
 			name: "binary numeric expression >",
 			input: &BinaryExpr{
-				left:  NewLiteralExpr(1, TypeNumber),
-				right: NewLiteralExpr(2, TypeNumber),
+				left:  NewLiteralExpr(1, TypeInt),
+				right: NewLiteralExpr(2, TypeInt),
 				op:    OpGt,
 			},
 			ctx:  NewEvalContext(nil),
@@ -230,8 +323,8 @@ func TestExpressionEval(t *testing.T) {
 		{
 			name: "binary numeric expression >=",
 			input: &BinaryExpr{
-				left:  NewLiteralExpr(1, TypeNumber),
-				right: NewLiteralExpr(2, TypeNumber),
+				left:  NewLiteralExpr(1, TypeInt),
+				right: NewLiteralExpr(2, TypeInt),
 				op:    OpGe,
 			},
 			ctx:  NewEvalContext(nil),
@@ -240,8 +333,8 @@ func TestExpressionEval(t *testing.T) {
 		{
 			name: "binary numeric expression <",
 			input: &BinaryExpr{
-				left:  NewLiteralExpr(1, TypeNumber),
-				right: NewLiteralExpr(2, TypeNumber),
+				left:  NewLiteralExpr(1, TypeInt),
+				right: NewLiteralExpr(2, TypeInt),
 				op:    OpLt,
 			},
 			ctx:  NewEvalContext(nil),
@@ -250,8 +343,8 @@ func TestExpressionEval(t *testing.T) {
 		{
 			name: "binary numeric expression <=",
 			input: &BinaryExpr{
-				left:  NewLiteralExpr(1, TypeNumber),
-				right: NewLiteralExpr(2, TypeNumber),
+				left:  NewLiteralExpr(1, TypeInt),
+				right: NewLiteralExpr(2, TypeInt),
 				op:    OpLt,
 			},
 			ctx:  NewEvalContext(nil),
@@ -356,6 +449,16 @@ func TestExpressionEval(t *testing.T) {
 			},
 			ctx:     NewEvalContext(nil),
 			wantErr: errors.New("Invalid type"),
+		},
+		{
+			name: "binary expression with floats",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr(1.0, TypeFloat),
+				right: NewLiteralExpr(2.0, TypeFloat),
+				op:    OpPlus,
+			},
+			ctx:  NewEvalContext(nil),
+			want: 3.0,
 		},
 	}
 

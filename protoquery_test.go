@@ -303,7 +303,7 @@ func TestFindAllMaps(t *testing.T) {
 	}{
 		{
 			name:  "string key lookup",
-			query: "/messages_with_map/string_string_map[key1]",
+			query: "/messages_with_map/string_string_map['key1']",
 			want:  []interface{}{"value1"},
 		},
 	}

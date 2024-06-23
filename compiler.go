@@ -64,7 +64,7 @@ func compileKeyQueryStep(tokens []*Token, ix int) (*KeyQueryStep, int, error) {
 	}, ix, nil
 }
 
-func compileQuery(tokens []*Token) (Query, error) {
+func CompileQuery(tokens []*Token) (Query, error) {
 	var query Query
 	ix := 0
 	for ix < len(tokens) {
@@ -198,7 +198,7 @@ func compileElementaryExpression(tokens []*Token, ix int) (Expression, int, erro
 		expr, ix, err = compileFunctionCallExpression(tokens, ix)
 	case TokenBang, TokenPlus, TokenMinus:
 		expr, ix, err = compileUnaryExpression(tokens, ix)
-	case TokenNumber, TokenBool, TokenString:
+	case TokenInt, TokenFloat, TokenBool, TokenString:
 		expr, ix, err = compileLiteralExpression(tokens, ix)
 	case TokenLParen:
 		ix++
@@ -218,7 +218,7 @@ func compileElementaryExpression(tokens []*Token, ix int) (Expression, int, erro
 }
 
 func compileLiteralExpression(tokens []*Token, ix int) (Expression, int, error) {
-	if !matchTokenAny(tokens, ix, TokenString, TokenNumber, TokenBool) {
+	if !matchTokenAny(tokens, ix, TokenString, TokenInt, TokenFloat, TokenBool) {
 		return nil, ix, fmt.Errorf("expected string or number, got %v", tokens[ix].Value)
 	}
 	var val any
@@ -226,13 +226,20 @@ func compileLiteralExpression(tokens []*Token, ix int) (Expression, int, error) 
 	typ := TypeString
 	switch tokens[ix].Kind {
 	case TokenString:
-	case TokenNumber:
+	case TokenInt:
 		intv, err := tokens[ix].IntValue()
 		if err != nil {
 			return nil, ix, err
 		}
 		val = intv
-		typ = TypeNumber
+		typ = TypeInt
+	case TokenFloat:
+		floatv, err := tokens[ix].FloatValue()
+		if err != nil {
+			return nil, ix, err
+		}
+		val = floatv
+		typ = TypeFloat
 	case TokenBool:
 		boolv, err := tokens[ix].BoolValue()
 		if err != nil {

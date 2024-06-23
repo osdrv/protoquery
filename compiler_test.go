@@ -88,7 +88,7 @@ func TestCompileQuery(t *testing.T) {
 			input: []*Token{
 				NewToken("nodename", TokenNode),
 				NewToken("[", TokenLBracket),
-				NewToken("1", TokenNumber),
+				NewToken("1", TokenInt),
 				NewToken("]", TokenRBracket),
 				NewToken("[", TokenLBracket),
 				NewToken("@", TokenAt),
@@ -104,7 +104,7 @@ func TestCompileQuery(t *testing.T) {
 				&KeyQueryStep{
 					expr: &LiteralExpr{
 						value: int64(1),
-						typ:   TypeNumber,
+						typ:   TypeInt,
 					},
 				},
 				&KeyQueryStep{
@@ -167,7 +167,7 @@ func TestCompileQuery(t *testing.T) {
 				NewToken("(", TokenLParen),
 				NewToken(")", TokenRParen),
 				NewToken("<=", TokenLessEqual),
-				NewToken("10", TokenNumber),
+				NewToken("10", TokenInt),
 				NewToken("]", TokenRBracket),
 			},
 			want: Query{
@@ -181,7 +181,7 @@ func TestCompileQuery(t *testing.T) {
 						},
 						right: &LiteralExpr{
 							value: int64(10),
-							typ:   TypeNumber,
+							typ:   TypeInt,
 						},
 						op: OpLe,
 					},
@@ -192,7 +192,7 @@ func TestCompileQuery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := compileQuery(tt.input)
+			got, err := CompileQuery(tt.input)
 			if tt.wantErr != nil {
 				if !errorsSimilar(err, tt.wantErr) {
 					t.Errorf("compileQuery() error = %v, wantErr %v", err, tt.wantErr)
@@ -220,11 +220,11 @@ func TestCompileExpression(t *testing.T) {
 		{
 			name: "numeric literal",
 			input: []*Token{
-				NewToken("123", TokenNumber),
+				NewToken("123", TokenInt),
 			},
 			want: &LiteralExpr{
 				value: int64(123),
-				typ:   TypeNumber,
+				typ:   TypeInt,
 			},
 		},
 		{
@@ -283,7 +283,7 @@ func TestCompileExpression(t *testing.T) {
 			input: []*Token{
 				NewToken("func", TokenNode),
 				NewToken("(", TokenLParen),
-				NewToken("42", TokenNumber),
+				NewToken("42", TokenInt),
 				NewToken(",", TokenComma),
 				NewToken("@", TokenAt),
 				NewToken("prop", TokenNode),
@@ -300,7 +300,7 @@ func TestCompileExpression(t *testing.T) {
 				args: []Expression{
 					&LiteralExpr{
 						value: int64(42),
-						typ:   TypeNumber,
+						typ:   TypeInt,
 					},
 					&PropertyExpr{
 						name: "prop",
@@ -333,12 +333,12 @@ func TestCompileExpression(t *testing.T) {
 			name: "unary plus expr",
 			input: []*Token{
 				NewToken("+", TokenPlus),
-				NewToken("42", TokenNumber),
+				NewToken("42", TokenInt),
 			},
 			want: &UnaryExpr{
 				expr: &LiteralExpr{
 					value: int64(42),
-					typ:   TypeNumber,
+					typ:   TypeInt,
 				},
 				op: OpPlus,
 			},
@@ -347,12 +347,12 @@ func TestCompileExpression(t *testing.T) {
 			name: "unary minus expr",
 			input: []*Token{
 				NewToken("-", TokenMinus),
-				NewToken("42", TokenNumber),
+				NewToken("42", TokenInt),
 			},
 			want: &UnaryExpr{
 				expr: &LiteralExpr{
 					value: int64(42),
-					typ:   TypeNumber,
+					typ:   TypeInt,
 				},
 				op: OpMinus,
 			},
@@ -360,18 +360,18 @@ func TestCompileExpression(t *testing.T) {
 		{
 			name: "binary expr with 2 literals",
 			input: []*Token{
-				NewToken("42", TokenNumber),
+				NewToken("42", TokenInt),
 				NewToken("+", TokenPlus),
-				NewToken("24", TokenNumber),
+				NewToken("24", TokenInt),
 			},
 			want: &BinaryExpr{
 				left: &LiteralExpr{
 					value: int64(42),
-					typ:   TypeNumber,
+					typ:   TypeInt,
 				},
 				right: &LiteralExpr{
 					value: int64(24),
-					typ:   TypeNumber,
+					typ:   TypeInt,
 				},
 				op: OpPlus,
 			},
@@ -379,25 +379,25 @@ func TestCompileExpression(t *testing.T) {
 		{
 			name: "binary with operator precedence",
 			input: []*Token{
-				NewToken("42", TokenNumber),
+				NewToken("42", TokenInt),
 				NewToken("+", TokenPlus),
-				NewToken("24", TokenNumber),
+				NewToken("24", TokenInt),
 				NewToken("*", TokenStar),
-				NewToken("2", TokenNumber),
+				NewToken("2", TokenInt),
 			},
 			want: &BinaryExpr{
 				left: &LiteralExpr{
 					value: int64(42),
-					typ:   TypeNumber,
+					typ:   TypeInt,
 				},
 				right: &BinaryExpr{
 					left: &LiteralExpr{
 						value: int64(24),
-						typ:   TypeNumber,
+						typ:   TypeInt,
 					},
 					right: &LiteralExpr{
 						value: int64(2),
-						typ:   TypeNumber,
+						typ:   TypeInt,
 					},
 					op: OpMul,
 				},
@@ -408,28 +408,28 @@ func TestCompileExpression(t *testing.T) {
 			name: "binary with parentheses",
 			input: []*Token{
 				NewToken("(", TokenLParen),
-				NewToken("42", TokenNumber),
+				NewToken("42", TokenInt),
 				NewToken("+", TokenPlus),
-				NewToken("24", TokenNumber),
+				NewToken("24", TokenInt),
 				NewToken(")", TokenRParen),
 				NewToken("*", TokenStar),
-				NewToken("2", TokenNumber),
+				NewToken("2", TokenInt),
 			},
 			want: &BinaryExpr{
 				left: &BinaryExpr{
 					left: &LiteralExpr{
 						value: int64(42),
-						typ:   TypeNumber,
+						typ:   TypeInt,
 					},
 					right: &LiteralExpr{
 						value: int64(24),
-						typ:   TypeNumber,
+						typ:   TypeInt,
 					},
 					op: OpPlus,
 				},
 				right: &LiteralExpr{
 					value: int64(2),
-					typ:   TypeNumber,
+					typ:   TypeInt,
 				},
 				op: OpMul,
 			},
@@ -437,25 +437,25 @@ func TestCompileExpression(t *testing.T) {
 		{
 			name: "comparison expression with precedence",
 			input: []*Token{
-				NewToken("42", TokenNumber),
+				NewToken("42", TokenInt),
 				NewToken("<=", TokenLessEqual),
-				NewToken("24", TokenNumber),
+				NewToken("24", TokenInt),
 				NewToken("+", TokenPlus),
-				NewToken("2", TokenNumber),
+				NewToken("2", TokenInt),
 			},
 			want: &BinaryExpr{
 				left: &LiteralExpr{
 					value: int64(42),
-					typ:   TypeNumber,
+					typ:   TypeInt,
 				},
 				right: &BinaryExpr{
 					left: &LiteralExpr{
 						value: int64(24),
-						typ:   TypeNumber,
+						typ:   TypeInt,
 					},
 					right: &LiteralExpr{
 						value: int64(2),
-						typ:   TypeNumber,
+						typ:   TypeInt,
 					},
 					op: OpPlus,
 				},

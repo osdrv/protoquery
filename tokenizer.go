@@ -13,12 +13,16 @@ func isDigit(s string, ix int) bool {
 	return ix < len(s) && s[ix] >= '0' && s[ix] <= '9'
 }
 
-func readNumber(s string, ix int) (string, int) {
+func readNumber(s string, ix int) (string, int, bool) {
+	isf := false
 	start := ix
 	for ix < len(s) && (isDigit(s, ix) || s[ix] == '.') {
+		if s[ix] == '.' {
+			isf = true
+		}
 		ix++
 	}
-	return s[start:ix], ix
+	return s[start:ix], ix, isf
 }
 
 func readNode(s string, ix int) (string, int) {
@@ -126,8 +130,13 @@ func tokenizeXPathQuery(query string) ([]*Token, error) {
 			}
 		} else if isDigit(query, ix) {
 			var number string
-			number, ix = readNumber(query, ix)
-			tokens = append(tokens, NewToken(number, TokenNumber))
+			var isf bool
+			number, ix, isf = readNumber(query, ix)
+			if isf {
+				tokens = append(tokens, NewToken(number, TokenFloat))
+			} else {
+				tokens = append(tokens, NewToken(number, TokenInt))
+			}
 		} else {
 			return nil, fmt.Errorf("Unexpected character %q at position %d", query[ix], ix)
 		}

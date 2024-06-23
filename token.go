@@ -18,6 +18,7 @@ const (
 	TokenDotDot       TokenKind = ':' // DotDot is a pseudo-token that represents a double dot.
 	TokenDoubleQuote  TokenKind = '"'
 	TokenEqual        TokenKind = '='
+	TokenFloat        TokenKind = 'F' // Float is a pseudo-token that represents a floating point number.
 	TokenNotEqual     TokenKind = '!' // NotEqual is a pseudo-token that represents a not equal operator.
 	TokenGreater      TokenKind = '>'
 	TokenGreaterEqual TokenKind = 'G' // GreaterEqual is a pseudo-token that represents a greater than or equal operator.
@@ -27,7 +28,7 @@ const (
 	TokenLessEqual    TokenKind = 'L' // LessEqual is a pseudo-token that represents a less than or equal operator.
 	TokenMinus        TokenKind = '-'
 	TokenNode         TokenKind = 'N' // Node is a pseudo-token that represents a node.
-	TokenNumber       TokenKind = '0' // Number is a pseudo-token that represents a number.
+	TokenInt          TokenKind = '0' // Number is a pseudo-token that represents an integer.
 	TokenOr           TokenKind = 'O' // Or is a pseudo-token that represents a logical OR operator.
 	TokenPipe         TokenKind = '|'
 	TokenPlus         TokenKind = '+'
@@ -59,7 +60,7 @@ func (t *Token) String() string {
 }
 
 func (t *Token) IntValue() (int64, error) {
-	if t.Kind != TokenNumber {
+	if t.Kind != TokenInt {
 		return 0, fmt.Errorf("Token is not a number: %v", t.Kind)
 	}
 	ix, err := strconv.ParseInt(t.Value, 10, 64)
@@ -67,6 +68,17 @@ func (t *Token) IntValue() (int64, error) {
 		return 0, err
 	}
 	return ix, nil
+}
+
+func (t *Token) FloatValue() (float64, error) {
+	if t.Kind != TokenFloat {
+		return 0, fmt.Errorf("Token is not a number: %v", t.Kind)
+	}
+	fx, err := strconv.ParseFloat(t.Value, 64)
+	if err != nil {
+		return 0, err
+	}
+	return fx, nil
 }
 
 func (t *Token) BoolValue() (bool, error) {

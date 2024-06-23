@@ -11,6 +11,8 @@ message Book {
   string title = 1;
   string author = 2;
   float price = 3;
+  int32 pages = 4;
+  bool on_sale = 5;
 }
 
 // The bookstore message represents a bookstore.

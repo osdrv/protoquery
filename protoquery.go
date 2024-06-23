@@ -14,7 +14,7 @@ func Compile(q string) (*ProtoQuery, error) {
 	if err != nil {
 		return nil, err
 	}
-	query, err := compileQuery(tokens)
+	query, err := CompileQuery(tokens)
 	if err != nil {
 		return nil, err
 	}
@@ -34,6 +34,14 @@ func isList(val protoreflect.Value) bool {
 		return false
 	}
 	_, ok := val.Interface().(protoreflect.List)
+	return ok
+}
+
+func isMap(val protoreflect.Value) bool {
+	if !val.IsValid() {
+		return false
+	}
+	_, ok := val.Interface().(protoreflect.Map)
 	return ok
 }
 
@@ -61,6 +69,8 @@ func flatten(val protoreflect.Value) []interface{} {
 	}
 	return res
 }
+
+type tmpList []any
 
 func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 	res := []interface{}{}
