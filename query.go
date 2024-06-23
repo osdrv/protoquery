@@ -1,10 +1,7 @@
 package protoquery
 
 import (
-	"fmt"
 	"strings"
-
-	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 type QueryStepKind int
@@ -12,8 +9,6 @@ type QueryStepKind int
 const (
 	SelfQueryStepKind QueryStepKind = iota
 	NodeQueryStepKind
-	AttrFilterQueryStepKind
-	IndexQueryStepKind
 	KeyQueryStepKind
 	RootQueryStepKind
 	RecursiveDescentQueryStepKind
@@ -97,68 +92,17 @@ func (qs *RecursiveDescentQueryStep) Kind() QueryStepKind {
 	return RecursiveDescentQueryStepKind
 }
 
-type AttrFilterQueryStep struct {
-	*defaultQueryStep
-	predicate Predicate
-}
-
-var _ QueryStep = (*AttrFilterQueryStep)(nil)
-
-func (qs *AttrFilterQueryStep) Match(val protoreflect.Value) bool {
-	return qs.predicate.Match(val)
-}
-
-func (qs *AttrFilterQueryStep) String() string {
-	return "[@" + qs.predicate.String() + "]"
-}
-
-func (qs *AttrFilterQueryStep) Kind() QueryStepKind {
-	return AttrFilterQueryStepKind
-}
-
-// Deprecated: use KeyQueryStep instead.
-type IndexQueryStep struct {
-	*defaultQueryStep
-	index int
-}
-
-var _ QueryStep = (*IndexQueryStep)(nil)
-
-func (qs *IndexQueryStep) GetElement(list protoreflect.List) (protoreflect.Value, bool) {
-	if list.IsValid() && qs.index < list.Len() {
-		return list.Get(qs.index), true
-	}
-	return protoreflect.Value{}, false
-}
-
-func (qs *IndexQueryStep) String() string {
-	return fmt.Sprintf("[%d]", qs.index)
-}
-
-func (qs *IndexQueryStep) Kind() QueryStepKind {
-	return IndexQueryStepKind
-}
-
 type KeyQueryStep struct {
 	*defaultQueryStep
-	Term  string
-	IsNum bool
-	Num   int
+	expr Expression
 }
 
 var _ QueryStep = (*KeyQueryStep)(nil)
 
 func (qs *KeyQueryStep) String() string {
-	return "[" + qs.Term + "]"
+	return "[" + qs.expr.String() + "]"
 }
 
 func (qs *KeyQueryStep) Kind() QueryStepKind {
 	return KeyQueryStepKind
 }
-
-//func (qs *KeyQueryStep) GetElement(val protoreflect.Value) (protoreflect.Value, bool) {
-//	if list.IsValid() && qs.Num < list.Len() {
-//		return list.Get(qs.index), true
-//	}
-//	return protoreflect.Value{}, false
-//}

@@ -35,10 +35,9 @@ func TestCompileQuery(t *testing.T) {
 				&NodeQueryStep{
 					name: "nodename",
 				},
-				&AttrFilterQueryStep{
-					predicate: &AttrPredicate{
-						Name: "attr",
-						Cmp:  AttrCmpExist,
+				&KeyQueryStep{
+					expr: &PropertyExpr{
+						name: "attr",
 					},
 				},
 			},
@@ -58,11 +57,16 @@ func TestCompileQuery(t *testing.T) {
 				&NodeQueryStep{
 					name: "nodename",
 				},
-				&AttrFilterQueryStep{
-					predicate: &AttrPredicate{
-						Name:  "attr",
-						Cmp:   AttrCmpEq,
-						Value: "value",
+				&KeyQueryStep{
+					expr: &BinaryExpr{
+						left: &PropertyExpr{
+							name: "attr",
+						},
+						right: &LiteralExpr{
+							value: "value",
+							typ:   TypeString,
+						},
+						op: OpEq,
 					},
 				},
 			},
@@ -77,7 +81,7 @@ func TestCompileQuery(t *testing.T) {
 				NewToken("=", TokenEqual),
 				NewToken("]", TokenRBracket),
 			},
-			wantErr: fmt.Errorf("expected string or number"),
+			wantErr: fmt.Errorf("unexpected token ]"),
 		},
 		{
 			name: "node with an index dereference and an attribute filter",
@@ -98,15 +102,21 @@ func TestCompileQuery(t *testing.T) {
 					name: "nodename",
 				},
 				&KeyQueryStep{
-					Term:  "1",
-					IsNum: true,
-					Num:   1,
+					expr: &LiteralExpr{
+						value: int64(1),
+						typ:   TypeNumber,
+					},
 				},
-				&AttrFilterQueryStep{
-					predicate: &AttrPredicate{
-						Name:  "attr",
-						Cmp:   AttrCmpEq,
-						Value: "value",
+				&KeyQueryStep{
+					expr: &BinaryExpr{
+						left: &PropertyExpr{
+							name: "attr",
+						},
+						right: &LiteralExpr{
+							value: "value",
+							typ:   TypeString,
+						},
+						op: OpEq,
 					},
 				},
 			},
@@ -145,6 +155,36 @@ func TestCompileQuery(t *testing.T) {
 				&RecursiveDescentQueryStep{},
 				&NodeQueryStep{
 					name: "child",
+				},
+			},
+		},
+		{
+			name: "node with an attribute with a function call",
+			input: []*Token{
+				NewToken("nodename", TokenNode),
+				NewToken("[", TokenLBracket),
+				NewToken("position", TokenNode),
+				NewToken("(", TokenLParen),
+				NewToken(")", TokenRParen),
+				NewToken("<=", TokenLessEqual),
+				NewToken("10", TokenNumber),
+				NewToken("]", TokenRBracket),
+			},
+			want: Query{
+				&NodeQueryStep{
+					name: "nodename",
+				},
+				&KeyQueryStep{
+					expr: &BinaryExpr{
+						left: &FunctionCallExpr{
+							handle: "position",
+						},
+						right: &LiteralExpr{
+							value: int64(10),
+							typ:   TypeNumber,
+						},
+						op: OpLe,
+					},
 				},
 			},
 		},
@@ -513,7 +553,7 @@ func TestCompileExpression(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := CompileExpression(tt.input)
+			got, _, err := CompileExpression(tt.input, 0)
 			if tt.wantErr != nil {
 				if !errorsSimilar(err, tt.wantErr) {
 					t.Errorf("compileExpression() error = %v, wantErr %v", err, tt.wantErr)

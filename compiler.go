@@ -4,6 +4,23 @@ import (
 	"fmt"
 )
 
+var (
+	tokenToOp = map[TokenKind]Operator{
+		TokenPlus:         OpPlus,
+		TokenMinus:        OpMinus,
+		TokenAnd:          OpAnd,
+		TokenOr:           OpOr,
+		TokenStar:         OpMul,
+		TokenSlash:        OpDiv,
+		TokenEqual:        OpEq,
+		TokenNotEqual:     OpNe,
+		TokenLess:         OpLt,
+		TokenLessEqual:    OpLe,
+		TokenGreater:      OpLt,
+		TokenGreaterEqual: OpLe,
+	}
+)
+
 func matchToken(tokens []*Token, ix int, kind TokenKind) bool {
 	return ix < len(tokens) && tokens[ix].Kind == kind
 }
@@ -17,45 +34,6 @@ func matchTokenAny(tokens []*Token, ix int, kinds ...TokenKind) bool {
 	return false
 }
 
-var (
-	tokenToCmp = map[TokenKind]AttrCmp{
-		TokenEqual:        AttrCmpEq,
-		TokenNotEqual:     AttrCmpNe,
-		TokenLess:         AttrCmpLt,
-		TokenLessEqual:    AttrCmpLe,
-		TokenGreater:      AttrCmpGt,
-		TokenGreaterEqual: AttrCmpGe,
-	}
-)
-
-func compilePredicate(tokens []*Token, ix int) (Predicate, int, error) {
-	p := &AttrPredicate{}
-	if !matchToken(tokens, ix, TokenAt) {
-		return nil, ix, fmt.Errorf("expected @, got %v", tokens[ix].Kind)
-	}
-	ix++
-	if !matchToken(tokens, ix, TokenNode) {
-		return nil, ix, fmt.Errorf("expected attribute name, got %v", tokens[ix].Value)
-	}
-	p.Name = tokens[ix].Value
-	p.Cmp = AttrCmpExist
-	ix++
-
-	if matchTokenAny(tokens, ix, TokenEqual, TokenGreater, TokenGreaterEqual,
-		TokenNotEqual, TokenLess, TokenLessEqual) {
-		p.Cmp = tokenToCmp[tokens[ix].Kind]
-		ix++
-		if !matchTokenAny(tokens, ix, TokenString, TokenNumber) {
-			return nil, ix, fmt.Errorf("expected string or number, got %v", tokens[ix].Value)
-		}
-		// TODO(osdrv): are we loosing the type information here?
-		p.Value = tokens[ix].Value
-		ix++
-	}
-
-	return p, ix, nil
-}
-
 func compileNodeQueryStep(tokens []*Token, ix int) (*NodeQueryStep, int, error) {
 	nqs := &NodeQueryStep{}
 	if !matchToken(tokens, ix, TokenNode) {
@@ -66,42 +44,24 @@ func compileNodeQueryStep(tokens []*Token, ix int) (*NodeQueryStep, int, error) 
 	return nqs, ix, nil
 }
 
-func compileKeyOrAttrFilterQueryStep(tokens []*Token, ix int) (QueryStep, int, error) {
+func compileKeyQueryStep(tokens []*Token, ix int) (*KeyQueryStep, int, error) {
+	var expr Expression
+	var err error
 	if !matchToken(tokens, ix, TokenLBracket) {
 		return nil, ix, fmt.Errorf("expected [, got %v", tokens[ix].Value)
 	}
 	ix++
-	var qs QueryStep
-
-	if matchToken(tokens, ix, TokenAt) {
-		// Read attribute filter
-		var p Predicate
-		var err error
-		p, ix, err = compilePredicate(tokens, ix)
-		if err != nil {
-			return nil, ix, err
-		}
-		qs = &AttrFilterQueryStep{predicate: p}
-	} else {
-		kqs := &KeyQueryStep{
-			Term: tokens[ix].Value,
-		}
-		// TODO(osdrv): this block of code would have to undergo another round of refactoring when
-		// I'll add length() and other expressions. Good enough for now as an intermediate step.
-		if num, err := tokens[ix].IntValue(); err == nil {
-			kqs.IsNum = true
-			kqs.Num = int(num)
-		}
-		qs = kqs
-		ix++
+	expr, ix, err = CompileExpression(tokens, ix)
+	if err != nil {
+		return nil, ix, err
 	}
-
 	if !matchToken(tokens, ix, TokenRBracket) {
 		return nil, ix, fmt.Errorf("expected ], got %v", tokens[ix].Value)
 	}
 	ix++
-
-	return qs, ix, nil
+	return &KeyQueryStep{
+		expr: expr,
+	}, ix, nil
 }
 
 func compileQuery(tokens []*Token) (Query, error) {
@@ -130,7 +90,8 @@ func compileQuery(tokens []*Token) (Query, error) {
 			query = append(query, qs)
 		case TokenLBracket:
 			var qs QueryStep
-			qs, ix, err = compileKeyOrAttrFilterQueryStep(tokens, ix)
+			//qs, ix, err = compileKeyOrAttrFilterQueryStep(tokens, ix)
+			qs, ix, err = compileKeyQueryStep(tokens, ix)
 			if err != nil {
 				return nil, err
 			}
@@ -142,29 +103,9 @@ func compileQuery(tokens []*Token) (Query, error) {
 	return query, nil
 }
 
-// ===== Everything above this line is garbage =====
-
-func CompileExpression(tokens []*Token) (Expression, error) {
-	expr, _, err := compileComparisonExpression(tokens, 0)
-	return expr, err
+func CompileExpression(tokens []*Token, ix int) (Expression, int, error) {
+	return compileComparisonExpression(tokens, ix)
 }
-
-var (
-	tokenToOp = map[TokenKind]Operator{
-		TokenPlus:         OpPlus,
-		TokenMinus:        OpMinus,
-		TokenAnd:          OpAnd,
-		TokenOr:           OpOr,
-		TokenStar:         OpMul,
-		TokenSlash:        OpDiv,
-		TokenEqual:        OpEq,
-		TokenNotEqual:     OpNe,
-		TokenLess:         OpLt,
-		TokenLessEqual:    OpLe,
-		TokenGreater:      OpLt,
-		TokenGreaterEqual: OpLe,
-	}
-)
 
 func compileComparisonExpression(tokens []*Token, ix int) (Expression, int, error) {
 	var err error
@@ -381,20 +322,3 @@ func compileUnaryExpression(tokens []*Token, ix int) (Expression, int, error) {
 		expr: expr,
 	}, ix, nil
 }
-
-var (
-	BinaryOperators = map[TokenKind]Operator{
-		TokenEqual:        OpEq,
-		TokenNotEqual:     OpNe,
-		TokenLess:         OpLt,
-		TokenLessEqual:    OpLe,
-		TokenGreater:      OpGt,
-		TokenGreaterEqual: OpGe,
-		TokenAnd:          OpAnd,
-		TokenOr:           OpOr,
-		TokenPlus:         OpPlus,
-		TokenMinus:        OpMinus,
-		TokenStar:         OpMul,
-		TokenSlash:        OpDiv,
-	}
-)

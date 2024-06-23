@@ -1,8 +1,6 @@
 package protoquery
 
 import (
-	"fmt"
-
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
@@ -29,14 +27,6 @@ func Compile(q string) (*ProtoQuery, error) {
 type queueItem struct {
 	qix int
 	ptr protoreflect.Value
-}
-
-func debugf(format string, args ...interface{}) {
-	fmt.Printf(format+"\n", args...)
-}
-
-func panicf(format string, args ...interface{}) {
-	panic(fmt.Sprintf(format, args...))
 }
 
 func isList(val protoreflect.Value) bool {
