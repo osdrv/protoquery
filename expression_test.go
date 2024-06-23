@@ -567,3 +567,48 @@ func TestExpressionEval(t *testing.T) {
 		})
 	}
 }
+
+func TestIsAllPropertyExprs(t *testing.T) {
+	tests := []struct {
+		name  string
+		input Expression
+		want  bool
+	}{
+		{
+			name: "PropertyExpr",
+			input: &PropertyExpr{
+				name: "foo",
+			},
+			want: true,
+		},
+		{
+			name: "LiteralExpr",
+			input: &LiteralExpr{
+				value: int64(1),
+				typ:   TypeInt,
+			},
+			want: false,
+		},
+		{
+			name: "BinaryExpr with PropertyExprs",
+			input: &BinaryExpr{
+				left: &PropertyExpr{
+					name: "foo",
+				},
+				right: &PropertyExpr{
+					name: "bar",
+				},
+				op: OpAnd,
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isAllPropertyExprs(tt.input); got != tt.want {
+				t.Errorf("IsAllPropertyExprs() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

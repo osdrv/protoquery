@@ -135,6 +135,10 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 			if isList(head.ptr) {
 				list := head.ptr.List()
 				ctx := NewEvalContext(list)
+				// TODO(osdrv): we can pre-compute this as a property of the query
+				// rather than re-computing it on the go.
+				enforceBool := isAllPropertyExprs(ks.expr)
+				ctx = ctx.WithEnforceBool(enforceBool)
 				typ, err := ks.expr.Type(ctx)
 				if err != nil {
 					debugf("keyStep.Type(list) returned an error: %s", err)
@@ -144,7 +148,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 				case TypeBool:
 					var tl []protoreflect.Value
 					for i := 0; i < list.Len(); i++ {
-						ctxel := NewEvalContext(list.Get(i).Interface())
+						ctxel := NewEvalContext(list.Get(i).Interface()).WithEnforceBool(enforceBool)
 						v, err := ks.expr.Eval(ctxel)
 						if err != nil {
 							debugf("keyStep.Eval(list):bool returned an error on Eval: %s", err)

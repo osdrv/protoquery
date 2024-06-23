@@ -610,3 +610,21 @@ func toInt64(v any) (int64, error) {
 func toFloat64(v any) (float64, error) {
 	return reflect.ValueOf(v).Float(), nil
 }
+
+// isAllProps is a helper function that traverses the expression tree and returns true
+// if all the expressions are either properties or binary AND/OR expressions.
+func isAllPropertyExprs(e Expression) bool {
+	if e == nil {
+		return false
+	}
+	switch e.(type) {
+	case *PropertyExpr:
+		return true
+	case *BinaryExpr:
+		be := e.(*BinaryExpr)
+		return (be.op == OpAnd || be.op == OpOr) &&
+			isAllPropertyExprs(be.left) && isAllPropertyExprs(be.right)
+	default:
+		return false
+	}
+}
