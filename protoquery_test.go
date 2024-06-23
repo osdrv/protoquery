@@ -306,6 +306,11 @@ func TestFindAllMaps(t *testing.T) {
 			query: "/messages_with_map/string_string_map['key1']",
 			want:  []interface{}{"value1"},
 		},
+		{
+			name:  "missing key lookup",
+			query: "/messages_with_map/string_string_map['key4']",
+			want:  []interface{}{},
+		},
 	}
 
 	for _, tt := range tests {

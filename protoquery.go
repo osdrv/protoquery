@@ -190,7 +190,21 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 					debugf("keyStep.Type(list) returned an unsupported type: %s", typ)
 					continue
 				}
-				//} else if isMap(head.ptr) {
+			} else if isMap(head.ptr) {
+				mp := head.ptr.Map()
+				ctx := NewEvalContext(mp)
+				k, err := ks.expr.Eval(ctx)
+				if err != nil {
+					debugf("keyStep.Eval(map) returned an error: %s", err)
+					continue
+				}
+				key := protoreflect.ValueOf(k).MapKey()
+				if mp.Has(key) {
+					queue = append(queue, queueItem{
+						qix: head.qix + 1,
+						ptr: mp.Get(key),
+					})
+				}
 
 				//} else if isMessage(head.ptr) {
 
