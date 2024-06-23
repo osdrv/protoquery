@@ -78,6 +78,14 @@ func TestExpressionType(t *testing.T) {
 			want: TypeFloat,
 		},
 		{
+			name: "property with EnforceBool=true",
+			input: &PropertyExpr{
+				name: "price",
+			},
+			ctx:  NewEvalContext(msg.ProtoReflect()).WithEnforceBool(true),
+			want: TypeBool,
+		},
+		{
 			name: "binary addition expression with integers",
 			input: &BinaryExpr{
 				left:  NewLiteralExpr(42, TypeInt),
@@ -177,6 +185,30 @@ func TestExpressionEval(t *testing.T) {
 			},
 			ctx:  NewEvalContext(msg.ProtoReflect()),
 			want: float32(42.99),
+		},
+		{
+			name: "existing property with EnforceBool=true",
+			input: &PropertyExpr{
+				name: "price",
+			},
+			ctx:  NewEvalContext(msg.ProtoReflect()).WithEnforceBool(true),
+			want: true,
+		},
+		{
+			name: "existing unset property with EnforceBool=true",
+			input: &PropertyExpr{
+				name: "price",
+			},
+			ctx:  NewEvalContext(msgEmpty.ProtoReflect()).WithEnforceBool(true),
+			want: false,
+		},
+		{
+			name: "non existing property with EnforceBool=true",
+			input: &PropertyExpr{
+				name: "non_existing",
+			},
+			ctx:     NewEvalContext(msg.ProtoReflect()).WithEnforceBool(true),
+			wantErr: PropNotSet,
 		},
 		{
 			name: "non existing property",

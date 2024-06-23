@@ -73,13 +73,28 @@ type EvalContext struct {
 	// UseDefault is used to determine if the default value should be returned if
 	// the protobuf message property is not set.
 	UseDefault bool
+	// EnforceBool is a flag indicating that instead of returning the actual property
+	// value, the expression should check its presence in the context message.
+	EnforceBool bool
 }
+
+// TODO(osdrv): Builder pattern would be a good fit here.
+// Especially, ToBuilder() method.
 
 // WithUseDefault returns a copy of the context with UseDefault field override.
 func (ctx *EvalContext) WithUseDefault(useDefault bool) *EvalContext {
 	return &EvalContext{
-		This:       ctx.This,
-		UseDefault: useDefault,
+		This:        ctx.This,
+		UseDefault:  useDefault,
+		EnforceBool: ctx.EnforceBool,
+	}
+}
+
+func (ctx *EvalContext) WithEnforceBool(enforceBool bool) *EvalContext {
+	return &EvalContext{
+		This:        ctx.This,
+		UseDefault:  ctx.UseDefault,
+		EnforceBool: enforceBool,
 	}
 }
 
@@ -164,6 +179,9 @@ func (p *PropertyExpr) Eval(ctx *EvalContext) (any, error) {
 	}
 	fd := msg.Descriptor().Fields().ByName(protoreflect.Name(p.name))
 	if fd != nil {
+		if ctx.EnforceBool {
+			return msg.Has(fd), nil
+		}
 		if msg.Has(fd) {
 			return msg.Get(fd).Interface(), nil
 		} else if ctx.UseDefault {
@@ -174,6 +192,9 @@ func (p *PropertyExpr) Eval(ctx *EvalContext) (any, error) {
 }
 
 func (p *PropertyExpr) Type(ctx *EvalContext) (Type, error) {
+	if ctx.EnforceBool {
+		return TypeBool, nil
+	}
 	// TODO(osdrv): in the future we might pass primitive types directly
 	// to support `.` (this) operator.
 	msg, ok := ctx.This.(protoreflect.Message)
