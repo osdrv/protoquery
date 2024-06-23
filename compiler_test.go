@@ -72,6 +72,35 @@ func TestCompileQuery(t *testing.T) {
 			},
 		},
 		{
+			name: "node with attribute comparison",
+			input: []*Token{
+				NewToken("nodename", TokenNode),
+				NewToken("[", TokenLBracket),
+				NewToken("@", TokenAt),
+				NewToken("attr", TokenNode),
+				NewToken(">", TokenGreater),
+				NewToken("35", TokenInt),
+				NewToken("]", TokenRBracket),
+			},
+			want: Query{
+				&NodeQueryStep{
+					name: "nodename",
+				},
+				&KeyQueryStep{
+					expr: &BinaryExpr{
+						left: &PropertyExpr{
+							name: "attr",
+						},
+						right: &LiteralExpr{
+							value: int64(35),
+							typ:   TypeInt,
+						},
+						op: OpGt,
+					},
+				},
+			},
+		},
+		{
 			name: "node with attribute equality but a missing operand",
 			input: []*Token{
 				NewToken("nodename", TokenNode),

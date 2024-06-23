@@ -77,6 +77,36 @@ func TestExpressionType(t *testing.T) {
 			ctx:  NewEvalContext(msg.ProtoReflect()),
 			want: TypeFloat,
 		},
+		{
+			name: "binary addition expression with integers",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr(42, TypeInt),
+				right: NewLiteralExpr(2, TypeInt),
+				op:    OpPlus,
+			},
+			ctx:  NewEvalContext(nil),
+			want: TypeInt,
+		},
+		{
+			name: "binary comparison with integers",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr(42, TypeInt),
+				right: NewLiteralExpr(2, TypeInt),
+				op:    OpGt,
+			},
+			ctx:  NewEvalContext(nil),
+			want: TypeBool,
+		},
+		{
+			name: "binary comparison with floats",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr(42.99, TypeFloat),
+				right: NewLiteralExpr(2.0, TypeFloat),
+				op:    OpGt,
+			},
+			ctx:  NewEvalContext(nil),
+			want: TypeBool,
+		},
 	}
 
 	for _, tt := range tests {
@@ -98,6 +128,8 @@ func TestExpressionEval(t *testing.T) {
 		Author: "Alan A. A. Donovan",
 		Price:  42.99,
 	}
+
+	msgEmpty := &Book{}
 
 	tests := []struct {
 		name    string
@@ -153,6 +185,22 @@ func TestExpressionEval(t *testing.T) {
 			},
 			ctx:     NewEvalContext(msg.ProtoReflect()),
 			wantErr: PropNotSet,
+		},
+		{
+			name: "unset string property with UseDefault=false",
+			input: &PropertyExpr{
+				name: "author",
+			},
+			ctx:     NewEvalContext(msgEmpty.ProtoReflect()).WithUseDefault(false),
+			wantErr: PropNotSet,
+		},
+		{
+			name: "unset string property with UseDefault=true",
+			input: &PropertyExpr{
+				name: "author",
+			},
+			ctx:  NewEvalContext(msgEmpty.ProtoReflect()).WithUseDefault(true),
+			want: "",
 		},
 		{
 			name: "unary boolean expression !true",
@@ -459,6 +507,16 @@ func TestExpressionEval(t *testing.T) {
 			},
 			ctx:  NewEvalContext(nil),
 			want: 3.0,
+		},
+		{
+			name: "binary comparison expression with floats",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr(1.0, TypeFloat),
+				right: NewLiteralExpr(2.0, TypeFloat),
+				op:    OpLt,
+			},
+			ctx:  NewEvalContext(nil),
+			want: true,
 		},
 	}
 

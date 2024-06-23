@@ -55,13 +55,13 @@ var OpToStr = map[Operator]string{
 
 type BuildinContext map[string]any
 
-type Buildin struct {
+type Builtin struct {
 	body func(ctx BuildinContext, args []Expression) (any, error)
 	typ  Type
 }
 
 var (
-	buildinTypes = map[string]Type{
+	builtinTypes = map[string]Type{
 		"last":     TypeInt,
 		"length":   TypeInt,
 		"position": TypeInt,
@@ -70,6 +70,17 @@ var (
 
 type EvalContext struct {
 	This any
+	// UseDefault is used to determine if the default value should be returned if
+	// the protobuf message property is not set.
+	UseDefault bool
+}
+
+// WithUseDefault returns a copy of the context with UseDefault field override.
+func (ctx *EvalContext) WithUseDefault(useDefault bool) *EvalContext {
+	return &EvalContext{
+		This:       ctx.This,
+		UseDefault: useDefault,
+	}
 }
 
 func NewEvalContext(this any) *EvalContext {
@@ -152,8 +163,12 @@ func (p *PropertyExpr) Eval(ctx *EvalContext) (any, error) {
 		return nil, fmt.Errorf("Invalid context %T, want: protoreflect.Message", ctx)
 	}
 	fd := msg.Descriptor().Fields().ByName(protoreflect.Name(p.name))
-	if fd != nil && msg.Has(fd) {
-		return msg.Get(fd).Interface(), nil
+	if fd != nil {
+		if msg.Has(fd) {
+			return msg.Get(fd).Interface(), nil
+		} else if ctx.UseDefault {
+			return fd.Default().Interface(), nil
+		}
 	}
 	return nil, PropNotSet
 }
@@ -196,7 +211,7 @@ type FunctionCallExpr struct {
 var _ Expression = (*FunctionCallExpr)(nil)
 
 func NewFunctionCallExpr(handle string, args []Expression) (*FunctionCallExpr, error) {
-	typ, ok := buildinTypes[handle]
+	typ, ok := builtinTypes[handle]
 	if !ok {
 		return nil, fmt.Errorf("Unknown function invocation: %v", handle)
 	}
@@ -212,7 +227,7 @@ func (f *FunctionCallExpr) Eval(ctx *EvalContext) (any, error) {
 }
 
 func (f *FunctionCallExpr) Type(*EvalContext) (Type, error) {
-	return buildinTypes[f.handle], nil
+	return builtinTypes[f.handle], nil
 }
 
 func (f *FunctionCallExpr) String() string {
@@ -314,6 +329,21 @@ func NewBinaryExpression(left Expression, op Operator, right Expression) (*Binar
 
 var _ Expression = (*BinaryExpr)(nil)
 
+func typesCompatible(a, b Type) bool {
+	if a == b {
+		return true
+	}
+	// Keep types sorted to avoid duplicate statements here.
+	if a > b {
+		a, b = b, a
+	}
+	if a == TypeInt && b == TypeFloat {
+		return true
+	}
+
+	return false
+}
+
 func (b *BinaryExpr) Eval(ctx *EvalContext) (any, error) {
 	ltyp, lerr := b.left.Type(ctx)
 	if lerr != nil {
@@ -323,18 +353,18 @@ func (b *BinaryExpr) Eval(ctx *EvalContext) (any, error) {
 	if rerr != nil {
 		return nil, rerr
 	}
-	if ltyp != rtyp {
+	if !typesCompatible(ltyp, rtyp) {
 		return nil, fmt.Errorf("Type mismatch(%v Vs %v)", ltyp, rtyp)
 	}
 	switch b.op {
 	case OpEq, OpNe:
 		switch ltyp {
 		case TypeInt, TypeFloat:
-			return numericBinEval(ctx, b.left, b.right, b.op)
+			return numericBinEval(ctx.WithUseDefault(true), b.left, b.right, b.op)
 		case TypeString:
-			return stringBinEval(ctx, b.left, b.right, b.op)
+			return stringBinEval(ctx.WithUseDefault(true), b.left, b.right, b.op)
 		case TypeBool:
-			return boolBinEval(ctx, b.left, b.right, b.op)
+			return boolBinEval(ctx.WithUseDefault(true), b.left, b.right, b.op)
 		default:
 			return nil, fmt.Errorf("Invalid type %v for + operator", ltyp)
 		}
@@ -357,7 +387,13 @@ func (b *BinaryExpr) Eval(ctx *EvalContext) (any, error) {
 }
 
 func (b *BinaryExpr) Type(ctx *EvalContext) (Type, error) {
-	return b.left.Type(ctx)
+	switch b.op {
+	case OpEq, OpNe, OpLt, OpLe, OpGt, OpGe, OpAnd, OpOr:
+		return TypeBool, nil
+	default:
+
+		return b.left.Type(ctx)
+	}
 }
 
 func (b *BinaryExpr) String() string {
@@ -372,6 +408,13 @@ func numericBinEval(ctx *EvalContext, a, b Expression, op Operator) (any, error)
 	if atyp != TypeInt && atyp != TypeFloat {
 		return nil, fmt.Errorf("Invalid type %v for %v operator", atyp, op)
 	}
+	btyp, berr := b.Type(ctx)
+	if berr != nil {
+		return nil, berr
+	}
+	if btyp != TypeInt && btyp != TypeFloat {
+		return nil, fmt.Errorf("Invalid type %v for %v operator", btyp, op)
+	}
 	av, err := a.Eval(ctx)
 	if err != nil {
 		return nil, err
@@ -380,53 +423,80 @@ func numericBinEval(ctx *EvalContext, a, b Expression, op Operator) (any, error)
 	if err != nil {
 		return nil, err
 	}
+	// Coallesce types to float64 if they are both numeric but do not match.
+	if atyp != btyp {
+		if atyp == TypeInt {
+			av = float64(av.(int64))
+			atyp = TypeFloat
+		}
+		if btyp == TypeInt {
+			bv = float64(bv.(int64))
+			btyp = TypeFloat
+		}
+	}
 	if atyp == TypeInt {
+		ai, aerr := toInt64(av)
+		if aerr != nil {
+			return nil, aerr
+		}
+		bi, berr := toInt64(bv)
+		if berr != nil {
+			return nil, berr
+		}
 		switch op {
 		case OpPlus:
-			return av.(int64) + bv.(int64), nil
+			return ai + bi, nil
 		case OpMinus:
-			return av.(int64) - bv.(int64), nil
+			return ai - bi, nil
 		case OpMul:
-			return av.(int64) * bv.(int64), nil
+			return ai * bi, nil
 		case OpDiv:
-			return av.(int64) / bv.(int64), nil
+			return ai / bi, nil
 		case OpEq:
-			return av.(int64) == bv.(int64), nil
+			return ai == bi, nil
 		case OpNe:
-			return av.(int64) != bv.(int64), nil
+			return ai != bi, nil
 		case OpLt:
-			return av.(int64) < bv.(int64), nil
+			return ai < bi, nil
 		case OpLe:
-			return av.(int64) <= bv.(int64), nil
+			return ai <= bi, nil
 		case OpGt:
-			return av.(int64) > bv.(int64), nil
+			return ai > bi, nil
 		case OpGe:
-			return av.(int64) >= bv.(int64), nil
+			return ai >= bi, nil
 		default:
 			return nil, fmt.Errorf("Invalid operator %v", op)
 		}
 	} else if atyp == TypeFloat {
+		af, aerr := toFloat64(av)
+		if aerr != nil {
+			return nil, aerr
+		}
+		bf, berr := toFloat64(bv)
+		if berr != nil {
+			return nil, berr
+		}
 		switch op {
 		case OpPlus:
-			return av.(float64) + bv.(float64), nil
+			return af + bf, nil
 		case OpMinus:
-			return av.(float64) - bv.(float64), nil
+			return af - bf, nil
 		case OpMul:
-			return av.(float64) * bv.(float64), nil
+			return af * bf, nil
 		case OpDiv:
-			return av.(float64) / bv.(float64), nil
+			return af / bf, nil
 		case OpEq:
-			return av.(float64) == bv.(float64), nil
+			return af == bf, nil
 		case OpNe:
-			return av.(float64) != bv.(float64), nil
+			return af != bf, nil
 		case OpLt:
-			return av.(float64) < bv.(float64), nil
+			return af < bf, nil
 		case OpLe:
-			return av.(float64) <= bv.(float64), nil
+			return af <= bf, nil
 		case OpGt:
-			return av.(float64) > bv.(float64), nil
+			return af > bf, nil
 		case OpGe:
-			return av.(float64) >= bv.(float64), nil
+			return af >= bf, nil
 		default:
 			return nil, fmt.Errorf("Invalid operator %v", op)
 		}
@@ -482,6 +552,14 @@ func boolBinEval(ctx *EvalContext, a, b Expression, op Operator) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// There are cases where evaluation of the right side can be avoided.
+	if op == OpAnd && !av.(bool) {
+		return false, nil
+	} else if op == OpOr && av.(bool) {
+		return true, nil
+	}
+
 	bv, err := b.Eval(ctx)
 	if err != nil {
 		return nil, err
@@ -498,6 +576,10 @@ func boolBinEval(ctx *EvalContext, a, b Expression, op Operator) (any, error) {
 	default:
 		return nil, fmt.Errorf("Invalid operator %v", op)
 	}
+}
+
+func toBool(v any) (bool, error) {
+	return reflect.ValueOf(v).Bool(), nil
 }
 
 func toInt64(v any) (int64, error) {

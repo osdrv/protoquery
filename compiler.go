@@ -16,8 +16,8 @@ var (
 		TokenNotEqual:     OpNe,
 		TokenLess:         OpLt,
 		TokenLessEqual:    OpLe,
-		TokenGreater:      OpLt,
-		TokenGreaterEqual: OpLe,
+		TokenGreater:      OpGt,
+		TokenGreaterEqual: OpGe,
 	}
 )
 
