@@ -28,6 +28,7 @@ type queueItem struct {
 	qix     int
 	ptr     protoreflect.Value
 	tmplist []protoreflect.Value
+	descr   protoreflect.FieldDescriptor
 }
 
 func isMessage(val protoreflect.Value) bool {
@@ -106,8 +107,9 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 		case RootQueryStepKind:
 			debugf("Root step: %s", step)
 			queue = append(queue, queueItem{
-				qix: head.qix + 1,
-				ptr: head.ptr,
+				qix:   head.qix + 1,
+				ptr:   head.ptr,
+				descr: head.descr,
 			})
 		case NodeQueryStepKind:
 			debugf("Node step: %s", step)
@@ -121,13 +123,14 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 			}
 			for _, c := range cs {
 				msg := c.Message()
-				field, ok := findFieldByName(msg.Interface(), step.(*NodeQueryStep).name)
+				fd, ok := findFieldByName(msg.Interface(), step.(*NodeQueryStep).name)
 				if !ok {
 					continue
 				}
 				queue = append(queue, queueItem{
-					qix: head.qix + 1,
-					ptr: msg.Get(field),
+					qix:   head.qix + 1,
+					ptr:   msg.Get(fd),
+					descr: fd,
 				})
 			}
 		case KeyQueryStepKind:
@@ -167,6 +170,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 						queue = append(queue, queueItem{
 							qix:     head.qix + 1,
 							tmplist: tl,
+							// TODO: descr of a list element
 						})
 					}
 				case TypeInt:
@@ -198,11 +202,27 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 					debugf("keyStep.Eval(map) returned an error: %s", err)
 					continue
 				}
-				key := protoreflect.ValueOf(k).MapKey()
+				if head.descr == nil {
+					debugf("No information about map key type, trying the raw value")
+				} else {
+					if fd := head.descr; fd == nil || !fd.IsMap() {
+						panicf("Unexpected descriptor kind: want protoreflect.Map, got %v", head.descr.Kind())
+					}
+					var ok bool
+					mkKind := head.descr.MapKey().Kind()
+					k, ok = castToProtoreflectKind(k, mkKind)
+					if !ok {
+						debugf("Can not cast value %+v to protoreflect.Kind=%v", k, mkKind)
+						continue
+					}
+				}
+				exprval := protoreflect.ValueOf(k)
+				key := exprval.MapKey()
 				if mp.Has(key) {
 					queue = append(queue, queueItem{
-						qix: head.qix + 1,
-						ptr: mp.Get(key),
+						qix:   head.qix + 1,
+						ptr:   mp.Get(key),
+						descr: head.descr.MapValue(),
 					})
 				}
 
