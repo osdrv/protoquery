@@ -2,7 +2,6 @@ package protoquery
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -597,18 +596,6 @@ func boolBinEval(ctx *EvalContext, a, b Expression, op Operator) (any, error) {
 	default:
 		return nil, fmt.Errorf("Invalid operator %v", op)
 	}
-}
-
-func toBool(v any) (bool, error) {
-	return reflect.ValueOf(v).Bool(), nil
-}
-
-func toInt64(v any) (int64, error) {
-	return reflect.ValueOf(v).Int(), nil
-}
-
-func toFloat64(v any) (float64, error) {
-	return reflect.ValueOf(v).Float(), nil
 }
 
 // isAllProps is a helper function that traverses the expression tree and returns true

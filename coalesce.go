@@ -1,6 +1,22 @@
 package protoquery
 
-import protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+import (
+	reflect "reflect"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+)
+
+func toBool(v any) (bool, error) {
+	return reflect.ValueOf(v).Bool(), nil
+}
+
+func toInt64(v any) (int64, error) {
+	return reflect.ValueOf(v).Int(), nil
+}
+
+func toFloat64(v any) (float64, error) {
+	return reflect.ValueOf(v).Float(), nil
+}
 
 func castToProtoreflectKind(v any, kind protoreflect.Kind) (any, bool) {
 	switch v.(type) {

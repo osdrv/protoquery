@@ -25,10 +25,10 @@ func Compile(q string) (*ProtoQuery, error) {
 
 // queueItem is an internal structure to keep track of the moving multi-head pointer.
 type queueItem struct {
-	qix     int
-	ptr     protoreflect.Value
-	tmplist []protoreflect.Value
-	descr   protoreflect.FieldDescriptor
+	qix int
+	ptr protoreflect.Value
+	//tmplist []protoreflect.Value
+	descr protoreflect.FieldDescriptor
 }
 
 func isMessage(val protoreflect.Value) bool {
@@ -93,13 +93,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 	for len(queue) > 0 {
 		head, queue = queue[0], queue[1:]
 		if head.qix >= len(pq.query) {
-			if head.tmplist != nil {
-				for _, v := range head.tmplist {
-					res = append(res, flatten(v)...)
-				}
-			} else {
-				res = append(res, flatten(head.ptr)...)
-			}
+			res = append(res, flatten(head.ptr)...)
 			continue
 		}
 		step := pq.query[head.qix]
@@ -122,6 +116,9 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 				cs = append(cs, head.ptr)
 			}
 			for _, c := range cs {
+				if !c.IsValid() {
+					continue
+				}
 				msg := c.Message()
 				fd, ok := findFieldByName(msg.Interface(), step.(*NodeQueryStep).name)
 				if !ok {
@@ -135,11 +132,18 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 			}
 		case KeyQueryStepKind:
 			ks := step.(*KeyQueryStep)
+			// TODO(osdrv): we should handle tmplist here
 			if isList(head.ptr) {
 				list := head.ptr.List()
 				ctx := NewEvalContext(list)
 				// TODO(osdrv): we can pre-compute this as a property of the query
 				// rather than re-computing it on the go.
+				// isAllPropertyExprs would check if the key only consists of
+				// attribute properties. I.e. it only checks if these properties
+				// are present in the message.
+				// E.g. [@foo && @bar && @baz]
+				// TODO(osdrv): all props + bool checks is still boolean.
+				// E.g. [@foo && @bar='value' && true]
 				enforceBool := isAllPropertyExprs(ks.expr)
 				ctx = ctx.WithEnforceBool(enforceBool)
 				typ, err := ks.expr.Type(ctx)
@@ -149,7 +153,11 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 				}
 				switch typ {
 				case TypeBool:
-					var tl []protoreflect.Value
+					// 1. Initialize a new list to store the intermediate results.
+					// 2. The list should have the same signature as the original list.
+					// 3. Populate the new list with the matching elements.
+					// 4. Append the new list to the queue.
+					tl := NewTmpList(head.descr)
 					for i := 0; i < list.Len(); i++ {
 						ctxel := NewEvalContext(list.Get(i).Interface()).WithEnforceBool(enforceBool)
 						v, err := ks.expr.Eval(ctxel)
@@ -163,14 +171,14 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 							continue
 						}
 						if pick {
-							tl = append(tl, list.Get(i))
+							tl.Append(list.Get(i))
 						}
 					}
-					if len(tl) > 0 {
+					if tl.Len() > 0 {
 						queue = append(queue, queueItem{
-							qix:     head.qix + 1,
-							tmplist: tl,
-							// TODO: descr of a list element
+							qix:   head.qix + 1,
+							ptr:   protoreflect.ValueOf(tl),
+							descr: head.descr, // The type should not change: we are still in a list.
 						})
 					}
 				case TypeInt:
@@ -188,6 +196,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 						queue = append(queue, queueItem{
 							qix: head.qix + 1,
 							ptr: list.Get(int(ix)),
+							// TODO(osdrv): type descriptor
 						})
 					}
 				default:
@@ -228,7 +237,36 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 
 				//} else if isMessage(head.ptr) {
 
-				//} else if isBytes(head.ptr) {
+			} else if isBytes(head.ptr) {
+				ctx := NewEvalContext(head.ptr)
+				typ, err := ks.expr.Type(ctx)
+				if err != nil {
+					debugf("keyStep.Type(bytes) returned an error: %s", err)
+					continue
+				}
+				if typ != TypeInt {
+					debugf("keyStep.Type(bytes) returned an unsupported type: %s", typ)
+					continue
+				}
+				k, err := ks.expr.Eval(ctx)
+				if err != nil {
+					debugf("keyStep.Eval(bytes) returned an error: %s", err)
+					continue
+				}
+				ix, err := toInt64(k)
+				if err != nil {
+					debugf("keyStep.Eval(bytes) returned an error on toInt64: %s", err)
+					continue
+				}
+				bytes := head.ptr.Bytes()
+				if ix >= 0 && int(ix) < len(bytes) {
+					queue = append(queue, queueItem{
+						qix: head.qix + 1,
+						// protoreflect does not support any ints below 32bits, hence the type casting
+						ptr: protoreflect.ValueOf(uint32(bytes[ix])),
+						// TODO(osdrv): type descriptor
+					})
+				}
 			} else {
 				debugf("Key step: %s", step)
 				panic("TODO(osdrv): not implemented")
