@@ -466,6 +466,21 @@ func TestTokenizeXPathQuery(t *testing.T) {
 				NewToken("]", TokenRBracket),
 			},
 		},
+		{
+			name:  "node with a function call in a bool expr",
+			input: "/books[position() <= 1]",
+			want: []*Token{
+				NewToken("/", TokenSlash),
+				NewToken("books", TokenNode),
+				NewToken("[", TokenLBracket),
+				NewToken("position", TokenNode),
+				NewToken("(", TokenLParen),
+				NewToken(")", TokenRParen),
+				NewToken("<=", TokenLessEqual),
+				NewToken("1", TokenInt),
+				NewToken("]", TokenRBracket),
+			},
+		},
 	}
 
 	for _, tt := range tests {

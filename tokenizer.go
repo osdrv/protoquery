@@ -57,6 +57,13 @@ func eatWhitespace(s string, ix int) int {
 	return ix
 }
 
+var (
+	tokenToEql = map[TokenKind]TokenKind{
+		TokenGreater: TokenGreaterEqual,
+		TokenLess:    TokenLessEqual,
+	}
+)
+
 func tokenizeXPathQuery(query string) ([]*Token, error) {
 	tokens := make([]*Token, 0, 1)
 	ix := 0
@@ -103,9 +110,16 @@ func tokenizeXPathQuery(query string) ([]*Token, error) {
 		} else if match(query, ix, TokenAt) {
 			ix++
 			tokens = append(tokens, NewToken(query[start:ix], TokenAt))
+		} else if matchAny(query, ix, TokenLess, TokenGreater) {
+			tk := TokenKind(query[ix])
+			ix++
+			if match(query, ix, TokenEqual) {
+				tk = tokenToEql[tk]
+				ix++
+			}
+			tokens = append(tokens, NewToken(query[start:ix], tk))
 		} else if matchAny(query, ix, TokenLBracket, TokenRBracket, TokenLParen,
-			TokenRParen, TokenStar, TokenEqual, TokenLess, TokenGreater, TokenMinus,
-			TokenPlus) {
+			TokenRParen, TokenStar, TokenEqual, TokenMinus, TokenPlus) {
 			tokens = append(tokens, NewToken(query[ix:ix+1], TokenKind(query[ix])))
 			ix++
 		} else if matchAny(query, ix, TokenSingleQuote, TokenDoubleQuote) {

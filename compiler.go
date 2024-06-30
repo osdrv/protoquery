@@ -90,7 +90,6 @@ func CompileQuery(tokens []*Token) (Query, error) {
 			query = append(query, qs)
 		case TokenLBracket:
 			var qs QueryStep
-			//qs, ix, err = compileKeyOrAttrFilterQueryStep(tokens, ix)
 			qs, ix, err = compileKeyQueryStep(tokens, ix)
 			if err != nil {
 				return nil, err

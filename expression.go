@@ -52,23 +52,57 @@ var OpToStr = map[Operator]string{
 	OpNot:   "!",
 }
 
-type BuildinContext map[string]any
-
 type Builtin struct {
-	body func(ctx BuildinContext, args []Expression) (any, error)
+	body func(ctx EvalContext, args []Expression) (any, error)
 	typ  Type
 }
 
+func (b *Builtin) Call(ctx EvalContext, args []Expression) (any, error) {
+	return b.body(ctx, args)
+}
+
+var BreakErr = fmt.Errorf("break")
+
 var (
-	builtinTypes = map[string]Type{
-		"last":     TypeInt,
-		"length":   TypeInt,
-		"position": TypeInt,
+	builtins = map[string]Builtin{
+		"length": {
+			body: func(ctx EvalContext, args []Expression) (any, error) {
+				list, ok := ctx.This().(protoreflect.List)
+				if !ok {
+					return nil, fmt.Errorf("length() is only supported for repeated fields")
+				}
+				return list.Len(), nil
+			},
+			typ: TypeInt,
+		},
+		"position": {
+			body: func(ctx EvalContext, args []Expression) (any, error) {
+				ictx, ok := ctx.(IndexedEvalContext)
+				if !ok {
+					return nil, fmt.Errorf("position() expects an indexed context")
+				}
+				return ictx.Index(), nil
+			},
+			typ: TypeInt,
+		},
 	}
 )
 
-type EvalContext struct {
-	This any
+type EvalOption func(EvalContext)
+
+func WithUseDefault(useDefault bool) EvalOption {
+	return func(ctx EvalContext) {
+		ctx.Options().UseDefault = useDefault
+	}
+}
+
+func WithEnforceBool(enforceBool bool) EvalOption {
+	return func(ctx EvalContext) {
+		ctx.Options().EnforceBool = enforceBool
+	}
+}
+
+type EvalOptions struct {
 	// UseDefault is used to determine if the default value should be returned if
 	// the protobuf message property is not set.
 	UseDefault bool
@@ -77,35 +111,75 @@ type EvalContext struct {
 	EnforceBool bool
 }
 
-// TODO(osdrv): Builder pattern would be a good fit here.
-// Especially, ToBuilder() method.
+type EvalContext interface {
+	This() any
+	Options() *EvalOptions
+	Copy(opts ...EvalOption) EvalContext
+}
 
-// WithUseDefault returns a copy of the context with UseDefault field override.
-func (ctx *EvalContext) WithUseDefault(useDefault bool) *EvalContext {
-	return &EvalContext{
-		This:        ctx.This,
-		UseDefault:  useDefault,
-		EnforceBool: ctx.EnforceBool,
+type IndexedEvalContext interface {
+	EvalContext
+	Index() int
+}
+
+type EvalContextImpl struct {
+	this any
+	opts *EvalOptions
+}
+
+func NewEvalContext(this any, opts ...EvalOption) EvalContext {
+	ctx := &EvalContextImpl{
+		this: this,
+		opts: &EvalOptions{},
+	}
+	for _, opt := range opts {
+		opt(ctx)
+	}
+	return ctx
+}
+
+var _ EvalContext = (*EvalContextImpl)(nil)
+
+func (ctx *EvalContextImpl) This() any {
+	return ctx.this
+}
+
+func (ctx *EvalContextImpl) Options() *EvalOptions {
+	return ctx.opts
+}
+
+func (ctx *EvalContextImpl) Copy(opts ...EvalOption) EvalContext {
+	return NewEvalContext(ctx.This(), opts...)
+}
+
+type IndexedEvalContextImpl struct {
+	EvalContext
+	index int
+}
+
+var _ IndexedEvalContext = (*IndexedEvalContextImpl)(nil)
+
+func NewIndexedEvalContext(this any, index int, opts ...EvalOption) IndexedEvalContext {
+	return &IndexedEvalContextImpl{
+		EvalContext: NewEvalContext(this, opts...),
+		index:       index,
 	}
 }
 
-func (ctx *EvalContext) WithEnforceBool(enforceBool bool) *EvalContext {
-	return &EvalContext{
-		This:        ctx.This,
-		UseDefault:  ctx.UseDefault,
-		EnforceBool: enforceBool,
-	}
+func (ctx *IndexedEvalContextImpl) Index() int {
+	return ctx.index
 }
 
-func NewEvalContext(this any) *EvalContext {
-	return &EvalContext{
-		This: this,
+func (ctx *IndexedEvalContextImpl) Copy(opts ...EvalOption) EvalContext {
+	return &IndexedEvalContextImpl{
+		EvalContext: ctx.EvalContext.Copy(opts...),
+		index:       ctx.index,
 	}
 }
 
 type Expression interface {
-	Eval(*EvalContext) (any, error)
-	Type(*EvalContext) (Type, error)
+	Eval(EvalContext) (any, error)
+	Type(EvalContext) (Type, error)
 	String() string
 }
 
@@ -123,7 +197,7 @@ func NewLiteralExpr(value any, typ Type) *LiteralExpr {
 
 var _ Expression = (*LiteralExpr)(nil)
 
-func (l *LiteralExpr) Eval(*EvalContext) (any, error) {
+func (l *LiteralExpr) Eval(EvalContext) (any, error) {
 	switch l.typ {
 	case TypeBool:
 		return l.value.(bool), nil
@@ -146,7 +220,7 @@ func (l *LiteralExpr) Eval(*EvalContext) (any, error) {
 	}
 }
 
-func (l *LiteralExpr) Type(*EvalContext) (Type, error) {
+func (l *LiteralExpr) Type(EvalContext) (Type, error) {
 	return l.typ, nil
 }
 
@@ -170,35 +244,35 @@ var (
 	PropNotSet = fmt.Errorf("Property not set")
 )
 
-func (p *PropertyExpr) Eval(ctx *EvalContext) (any, error) {
+func (p *PropertyExpr) Eval(ctx EvalContext) (any, error) {
 	// TODO(osdrv): implement wildcard
-	msg, ok := ctx.This.(protoreflect.Message)
+	msg, ok := ctx.This().(protoreflect.Message)
 	if !ok {
-		return nil, fmt.Errorf("Invalid context %T, want: protoreflect.Message", ctx)
+		return nil, fmt.Errorf("Invalid list value %T, want: protoreflect.Message", ctx.This())
 	}
 	fd := msg.Descriptor().Fields().ByName(protoreflect.Name(p.name))
 	if fd != nil {
-		if ctx.EnforceBool {
+		if ctx.Options().EnforceBool {
 			return msg.Has(fd), nil
 		}
 		if msg.Has(fd) {
 			return msg.Get(fd).Interface(), nil
-		} else if ctx.UseDefault {
+		} else if ctx.Options().UseDefault {
 			return fd.Default().Interface(), nil
 		}
 	}
 	return nil, PropNotSet
 }
 
-func (p *PropertyExpr) Type(ctx *EvalContext) (Type, error) {
-	if ctx.EnforceBool {
+func (p *PropertyExpr) Type(ctx EvalContext) (Type, error) {
+	if ctx.Options().EnforceBool {
 		return TypeBool, nil
 	}
 	// TODO(osdrv): in the future we might pass primitive types directly
 	// to support `.` (this) operator.
-	msg, ok := ctx.This.(protoreflect.Message)
+	msg, ok := ctx.This().(protoreflect.Message)
 	if !ok {
-		return TypeUnknown, fmt.Errorf("Invalid context %T, want: protoreflect.Message", ctx)
+		return TypeUnknown, fmt.Errorf("Invalid list value %T, want: protoreflect.Message", ctx.This())
 	}
 	fd, ok := findFieldByName(msg.Interface(), p.name)
 	if !ok {
@@ -231,23 +305,27 @@ type FunctionCallExpr struct {
 var _ Expression = (*FunctionCallExpr)(nil)
 
 func NewFunctionCallExpr(handle string, args []Expression) (*FunctionCallExpr, error) {
-	typ, ok := builtinTypes[handle]
+	builtin, ok := builtins[handle]
 	if !ok {
 		return nil, fmt.Errorf("Unknown function invocation: %v", handle)
 	}
 	return &FunctionCallExpr{
 		handle: handle,
 		args:   args,
-		typ:    typ,
+		typ:    builtin.typ,
 	}, nil
 }
 
-func (f *FunctionCallExpr) Eval(ctx *EvalContext) (any, error) {
-	return nil, fmt.Errorf("Not implemented")
+func (f *FunctionCallExpr) Eval(ctx EvalContext) (any, error) {
+	builtin, ok := builtins[f.handle]
+	if !ok {
+		return nil, fmt.Errorf("Unknown function %v", f.handle)
+	}
+	return builtin.Call(ctx, f.args)
 }
 
-func (f *FunctionCallExpr) Type(*EvalContext) (Type, error) {
-	return builtinTypes[f.handle], nil
+func (f *FunctionCallExpr) Type(EvalContext) (Type, error) {
+	return builtins[f.handle].typ, nil
 }
 
 func (f *FunctionCallExpr) String() string {
@@ -278,7 +356,7 @@ func NewUnaryExpr(op Operator, expr Expression) (*UnaryExpr, error) {
 	}, nil
 }
 
-func (u *UnaryExpr) Eval(ctx *EvalContext) (any, error) {
+func (u *UnaryExpr) Eval(ctx EvalContext) (any, error) {
 	switch u.op {
 	case OpMinus, OpPlus:
 		var f int64 = 1
@@ -319,7 +397,7 @@ func (u *UnaryExpr) Eval(ctx *EvalContext) (any, error) {
 	}
 }
 
-func (u *UnaryExpr) Type(ctx *EvalContext) (Type, error) {
+func (u *UnaryExpr) Type(ctx EvalContext) (Type, error) {
 	switch u.op {
 	case OpMinus, OpPlus:
 		return TypeInt, nil
@@ -364,7 +442,7 @@ func typesCompatible(a, b Type) bool {
 	return false
 }
 
-func (b *BinaryExpr) Eval(ctx *EvalContext) (any, error) {
+func (b *BinaryExpr) Eval(ctx EvalContext) (any, error) {
 	ltyp, lerr := b.left.Type(ctx)
 	if lerr != nil {
 		return nil, lerr
@@ -380,11 +458,11 @@ func (b *BinaryExpr) Eval(ctx *EvalContext) (any, error) {
 	case OpEq, OpNe:
 		switch ltyp {
 		case TypeInt, TypeFloat:
-			return numericBinEval(ctx.WithUseDefault(true), b.left, b.right, b.op)
+			return numericBinEval(ctx.Copy(WithUseDefault(true)), b.left, b.right, b.op)
 		case TypeString:
-			return stringBinEval(ctx.WithUseDefault(true), b.left, b.right, b.op)
+			return stringBinEval(ctx.Copy(WithUseDefault(true)), b.left, b.right, b.op)
 		case TypeBool:
-			return boolBinEval(ctx.WithUseDefault(true), b.left, b.right, b.op)
+			return boolBinEval(ctx.Copy(WithUseDefault(true)), b.left, b.right, b.op)
 		default:
 			return nil, fmt.Errorf("Invalid type %v for + operator", ltyp)
 		}
@@ -406,7 +484,7 @@ func (b *BinaryExpr) Eval(ctx *EvalContext) (any, error) {
 	}
 }
 
-func (b *BinaryExpr) Type(ctx *EvalContext) (Type, error) {
+func (b *BinaryExpr) Type(ctx EvalContext) (Type, error) {
 	switch b.op {
 	case OpEq, OpNe, OpLt, OpLe, OpGt, OpGe, OpAnd, OpOr:
 		return TypeBool, nil
@@ -420,7 +498,7 @@ func (b *BinaryExpr) String() string {
 	return fmt.Sprintf("%v %v %v", b.left, OpToStr[b.op], b.right)
 }
 
-func numericBinEval(ctx *EvalContext, a, b Expression, op Operator) (any, error) {
+func numericBinEval(ctx EvalContext, a, b Expression, op Operator) (any, error) {
 	atyp, aerr := a.Type(ctx)
 	if aerr != nil {
 		return nil, aerr
@@ -524,7 +602,7 @@ func numericBinEval(ctx *EvalContext, a, b Expression, op Operator) (any, error)
 	panic("should not happen")
 }
 
-func stringBinEval(ctx *EvalContext, a, b Expression, op Operator) (any, error) {
+func stringBinEval(ctx EvalContext, a, b Expression, op Operator) (any, error) {
 	atyp, aerr := a.Type(ctx)
 	if aerr != nil {
 		return nil, aerr
@@ -560,7 +638,7 @@ func stringBinEval(ctx *EvalContext, a, b Expression, op Operator) (any, error) 
 	}
 }
 
-func boolBinEval(ctx *EvalContext, a, b Expression, op Operator) (any, error) {
+func boolBinEval(ctx EvalContext, a, b Expression, op Operator) (any, error) {
 	atyp, aerr := a.Type(ctx)
 	if aerr != nil {
 		return nil, aerr

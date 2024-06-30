@@ -25,9 +25,8 @@ func Compile(q string) (*ProtoQuery, error) {
 
 // queueItem is an internal structure to keep track of the moving multi-head pointer.
 type queueItem struct {
-	qix int
-	ptr protoreflect.Value
-	//tmplist []protoreflect.Value
+	qix   int
+	ptr   protoreflect.Value
 	descr protoreflect.FieldDescriptor
 }
 
@@ -145,7 +144,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 				// TODO(osdrv): all props + bool checks is still boolean.
 				// E.g. [@foo && @bar='value' && true]
 				enforceBool := isAllPropertyExprs(ks.expr)
-				ctx = ctx.WithEnforceBool(enforceBool)
+				ctx = ctx.Copy(WithEnforceBool(enforceBool))
 				typ, err := ks.expr.Type(ctx)
 				if err != nil {
 					debugf("keyStep.Type(list) returned an error: %s", err)
@@ -159,7 +158,11 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 					// 4. Append the new list to the queue.
 					tl := NewTmpList(head.descr)
 					for i := 0; i < list.Len(); i++ {
-						ctxel := NewEvalContext(list.Get(i).Interface()).WithEnforceBool(enforceBool)
+						ctxel := NewIndexedEvalContext(
+							list.Get(i).Interface(),
+							i,
+							WithEnforceBool(enforceBool),
+						)
 						v, err := ks.expr.Eval(ctxel)
 						if err != nil {
 							debugf("keyStep.Eval(list):bool returned an error on Eval: %s", err)

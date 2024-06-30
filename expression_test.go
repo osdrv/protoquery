@@ -17,7 +17,7 @@ func TestExpressionType(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   Expression
-		ctx     *EvalContext
+		ctx     EvalContext
 		want    Type
 		wantErr error
 	}{
@@ -82,7 +82,7 @@ func TestExpressionType(t *testing.T) {
 			input: &PropertyExpr{
 				name: "price",
 			},
-			ctx:  NewEvalContext(msg.ProtoReflect()).WithEnforceBool(true),
+			ctx:  NewEvalContext(msg.ProtoReflect(), WithEnforceBool(true)),
 			want: TypeBool,
 		},
 		{
@@ -142,7 +142,7 @@ func TestExpressionEval(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   Expression
-		ctx     *EvalContext
+		ctx     EvalContext
 		want    any
 		wantErr error
 	}{
@@ -191,7 +191,7 @@ func TestExpressionEval(t *testing.T) {
 			input: &PropertyExpr{
 				name: "price",
 			},
-			ctx:  NewEvalContext(msg.ProtoReflect()).WithEnforceBool(true),
+			ctx:  NewEvalContext(msg.ProtoReflect(), WithEnforceBool(true)),
 			want: true,
 		},
 		{
@@ -199,7 +199,7 @@ func TestExpressionEval(t *testing.T) {
 			input: &PropertyExpr{
 				name: "price",
 			},
-			ctx:  NewEvalContext(msgEmpty.ProtoReflect()).WithEnforceBool(true),
+			ctx:  NewEvalContext(msgEmpty.ProtoReflect(), WithEnforceBool(true)),
 			want: false,
 		},
 		{
@@ -207,7 +207,7 @@ func TestExpressionEval(t *testing.T) {
 			input: &PropertyExpr{
 				name: "non_existing",
 			},
-			ctx:     NewEvalContext(msg.ProtoReflect()).WithEnforceBool(true),
+			ctx:     NewEvalContext(msg.ProtoReflect(), WithEnforceBool(true)),
 			wantErr: PropNotSet,
 		},
 		{
@@ -223,7 +223,7 @@ func TestExpressionEval(t *testing.T) {
 			input: &PropertyExpr{
 				name: "author",
 			},
-			ctx:     NewEvalContext(msgEmpty.ProtoReflect()).WithUseDefault(false),
+			ctx:     NewEvalContext(msgEmpty.ProtoReflect(), WithUseDefault(false)),
 			wantErr: PropNotSet,
 		},
 		{
@@ -231,7 +231,7 @@ func TestExpressionEval(t *testing.T) {
 			input: &PropertyExpr{
 				name: "author",
 			},
-			ctx:  NewEvalContext(msgEmpty.ProtoReflect()).WithUseDefault(true),
+			ctx:  NewEvalContext(msgEmpty.ProtoReflect(), WithUseDefault(true)),
 			want: "",
 		},
 		{

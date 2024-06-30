@@ -8,7 +8,7 @@ import (
 type TokenKind byte
 
 const (
-	TokenNone         TokenKind = iota
+	TokenNone         TokenKind = '0'
 	TokenAnd          TokenKind = '&' // And is a pseudo-token that represents a logical AND operator.
 	TokenAt           TokenKind = '@'
 	TokenBang         TokenKind = '!'
