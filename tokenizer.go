@@ -58,7 +58,7 @@ func eatWhitespace(s string, ix int) int {
 }
 
 var (
-	tokenToEql = map[TokenKind]TokenKind{
+	tokenStrictCmpToEql = map[TokenKind]TokenKind{
 		TokenGreater: TokenGreaterEqual,
 		TokenLess:    TokenLessEqual,
 	}
@@ -114,7 +114,7 @@ func tokenizeXPathQuery(query string) ([]*Token, error) {
 			tk := TokenKind(query[ix])
 			ix++
 			if match(query, ix, TokenEqual) {
-				tk = tokenToEql[tk]
+				tk = tokenStrictCmpToEql[tk]
 				ix++
 			}
 			tokens = append(tokens, NewToken(query[start:ix], tk))

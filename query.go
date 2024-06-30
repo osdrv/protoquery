@@ -31,10 +31,6 @@ type QueryStep interface {
 
 type defaultQueryStep struct{}
 
-func (qs *defaultQueryStep) Predicate() Predicate {
-	return nil
-}
-
 type SelfQueryStep struct {
 	*defaultQueryStep
 }

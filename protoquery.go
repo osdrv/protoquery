@@ -30,38 +30,6 @@ type queueItem struct {
 	descr protoreflect.FieldDescriptor
 }
 
-func isMessage(val protoreflect.Value) bool {
-	if !val.IsValid() {
-		return false
-	}
-	_, ok := val.Interface().(protoreflect.Message)
-	return ok
-}
-
-func isList(val protoreflect.Value) bool {
-	if !val.IsValid() {
-		return false
-	}
-	_, ok := val.Interface().(protoreflect.List)
-	return ok
-}
-
-func isMap(val protoreflect.Value) bool {
-	if !val.IsValid() {
-		return false
-	}
-	_, ok := val.Interface().(protoreflect.Map)
-	return ok
-}
-
-func isBytes(val protoreflect.Value) bool {
-	if !val.IsValid() {
-		return false
-	}
-	_, ok := val.Interface().([]byte)
-	return ok
-}
-
 func flatten(val protoreflect.Value) []interface{} {
 	res := []interface{}{}
 	switch val.Interface().(type) {
@@ -131,7 +99,6 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 			}
 		case KeyQueryStepKind:
 			ks := step.(*KeyQueryStep)
-			// TODO(osdrv): we should handle tmplist here
 			if isList(head.ptr) {
 				list := head.ptr.List()
 				ctx := NewEvalContext(list)
@@ -279,10 +246,4 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 		}
 	}
 	return res
-}
-
-func findFieldByName(msg proto.Message, name string) (protoreflect.FieldDescriptor, bool) {
-	fields := msg.ProtoReflect().Descriptor().Fields()
-	fd := fields.ByName(protoreflect.Name(name))
-	return fd, fd != nil
 }

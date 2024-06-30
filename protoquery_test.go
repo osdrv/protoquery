@@ -373,9 +373,24 @@ func TestFindAllListBuiltins(t *testing.T) {
 			want:  []any{store.Books[2]},
 		},
 		{
+			name:  "out-of-bounds index with length",
+			query: "/books[length() - 100]",
+			want:  []any{},
+		},
+		{
 			name:  "position in a boolean context",
 			query: "/books[position() <= 1]",
 			want:  []any{store.Books[0], store.Books[1]},
+		},
+		{
+			name:  "position with unexpected type",
+			query: "/books[position() > true]",
+			want:  []any{},
+		},
+		{
+			name:  "position with unexpected operand",
+			query: "/books[position() + 1]",
+			want:  []any{},
 		},
 	}
 
