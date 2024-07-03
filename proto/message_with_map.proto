@@ -26,4 +26,12 @@ message MessageWithMap {
     map<bool, double> bool_double_map = 16;
     map<bool, float> bool_float_map = 17;
     map<bool, bytes> bool_bytes_map = 18;
+
+    message InnerMessage {
+        int32 inner_int = 1;
+        string inner_string = 2;
+        repeated int32 inner_arr = 3;
+    }
+
+    map<string, InnerMessage> string_inner_map = 19;
 }

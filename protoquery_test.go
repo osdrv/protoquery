@@ -297,6 +297,13 @@ func TestFindAllMaps(t *testing.T) {
 					"key2": "value2",
 					"key3": "value3",
 				},
+				StringInnerMap: map[string]*MessageWithMap_InnerMessage{
+					"key4": {
+						InnerInt:    1,
+						InnerString: "string",
+						InnerArr:    []int32{1, 2, 3, 4, 5},
+					},
+				},
 			},
 		},
 	}
@@ -325,6 +332,11 @@ func TestFindAllMaps(t *testing.T) {
 			name:  "bool key lookup on a string-string map",
 			query: "/messages/with_map/string_string_map[true]",
 			want:  []any{},
+		},
+		{
+			name:  "string map inner message lookup",
+			query: "/messages_with_map/string_inner_map['key4']/inner_int",
+			want:  []any{int32(1)},
 		},
 	}
 

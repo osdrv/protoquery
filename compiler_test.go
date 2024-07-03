@@ -217,6 +217,31 @@ func TestCompileQuery(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "node with key and attribute filter",
+			input: []*Token{
+				NewToken("nodename", TokenNode),
+				NewToken("[", TokenLBracket),
+				NewToken("key", TokenString),
+				NewToken("]", TokenRBracket),
+				NewToken("/", TokenSlash),
+				NewToken("prop", TokenNode),
+			},
+			want: Query{
+				&NodeQueryStep{
+					name: "nodename",
+				},
+				&KeyQueryStep{
+					expr: &LiteralExpr{
+						value: "key",
+						typ:   TypeString,
+					},
+				},
+				&NodeQueryStep{
+					name: "prop",
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
