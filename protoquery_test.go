@@ -289,7 +289,7 @@ func TestFindAllRepeatedScalars(t *testing.T) {
 	}
 }
 
-func TestFindAllMaps(t *testing.T) {
+func TestFindAllMapAccess(t *testing.T) {
 	messages := &proto.MessageWithMapHolder{
 		MessagesWithMap: []*proto.MessageWithMap{
 			{
@@ -306,6 +306,66 @@ func TestFindAllMaps(t *testing.T) {
 					},
 				},
 			},
+			{
+				Int32InnerMap: map[int32]*proto.MessageWithMap_InnerMessage{
+					int32(123): {InnerString: "map with int32 key"},
+				},
+			},
+			{
+				Int64InnerMap: map[int64]*proto.MessageWithMap_InnerMessage{
+					int64(123): {InnerString: "map with int64 key"},
+				},
+			},
+			{
+				Uint32InnerMap: map[uint32]*proto.MessageWithMap_InnerMessage{
+					uint32(123): {InnerString: "map with uint32 key"},
+				},
+			},
+			{
+				Uint64InnerMap: map[uint64]*proto.MessageWithMap_InnerMessage{
+					uint64(123): {InnerString: "map with uint64 key"},
+				},
+			},
+			{
+				Sint32InnerMap: map[int32]*proto.MessageWithMap_InnerMessage{
+					int32(123): {InnerString: "map with sint32 key"},
+				},
+			},
+			{
+				Sint64InnerMap: map[int64]*proto.MessageWithMap_InnerMessage{
+					int64(123): {InnerString: "map with sint64 key"},
+				},
+			},
+			{
+				Fixed32InnerMap: map[uint32]*proto.MessageWithMap_InnerMessage{
+					uint32(123): {InnerString: "map with fixed32 key"},
+				},
+			},
+			{
+				Fixed64InnerMap: map[uint64]*proto.MessageWithMap_InnerMessage{
+					uint64(123): {InnerString: "map with fixed64 key"},
+				},
+			},
+			{
+				Sfixed32InnerMap: map[int32]*proto.MessageWithMap_InnerMessage{
+					int32(123): {InnerString: "map with sfixed32 key"},
+				},
+			},
+			{
+				Sfixed64InnerMap: map[int64]*proto.MessageWithMap_InnerMessage{
+					int64(123): {InnerString: "map with sfixed64 key"},
+				},
+			},
+			{
+				BoolInnerMap: map[bool]*proto.MessageWithMap_InnerMessage{
+					true: {InnerString: "map with bool key=true"},
+				},
+			},
+			{
+				BoolInnerMap: map[bool]*proto.MessageWithMap_InnerMessage{
+					false: {InnerString: "map with bool key=false"},
+				},
+			},
 		},
 	}
 
@@ -315,9 +375,69 @@ func TestFindAllMaps(t *testing.T) {
 		want  []any
 	}{
 		{
-			name:  "string key lookup",
-			query: "/messages_with_map/string_string_map['key1']",
-			want:  []any{"value1"},
+			name:  "int32 key lookup",
+			query: "/messages_with_map/int32_inner_map[123]/inner_string",
+			want:  []any{"map with int32 key"},
+		},
+		{
+			name:  "int64 key lookup",
+			query: "/messages_with_map/int64_inner_map[123]/inner_string",
+			want:  []any{"map with int64 key"},
+		},
+		{
+			name:  "uint32 key lookup",
+			query: "/messages_with_map/uint32_inner_map[123]/inner_string",
+			want:  []any{"map with uint32 key"},
+		},
+		{
+			name:  "uint64 key lookup",
+			query: "/messages_with_map/uint64_inner_map[123]/inner_string",
+			want:  []any{"map with uint64 key"},
+		},
+		{
+			name:  "sint32 key lookup",
+			query: "/messages_with_map/sint32_inner_map[123]/inner_string",
+			want:  []any{"map with sint32 key"},
+		},
+		{
+			name:  "sint64 key lookup",
+			query: "/messages_with_map/sint64_inner_map[123]/inner_string",
+			want:  []any{"map with sint64 key"},
+		},
+		{
+			name:  "fixed32 key lookup",
+			query: "/messages_with_map/fixed32_inner_map[123]/inner_string",
+			want:  []any{"map with fixed32 key"},
+		},
+		{
+			name:  "fixed64 key lookup",
+			query: "/messages_with_map/fixed64_inner_map[123]/inner_string",
+			want:  []any{"map with fixed64 key"},
+		},
+		{
+			name:  "sfixed32 key lookup",
+			query: "/messages_with_map/sfixed32_inner_map[123]/inner_string",
+			want:  []any{"map with sfixed32 key"},
+		},
+		{
+			name:  "sfixed64 key lookup",
+			query: "/messages_with_map/sfixed64_inner_map[123]/inner_string",
+			want:  []any{"map with sfixed64 key"},
+		},
+		{
+			name:  "bool key lookup=true",
+			query: "/messages_with_map/bool_inner_map[true]/inner_string",
+			want:  []any{"map with bool key=true"},
+		},
+		{
+			name:  "bool key lookup=false",
+			query: "/messages_with_map/bool_inner_map[false]/inner_string",
+			want:  []any{"map with bool key=false"},
+		},
+		{
+			name:  "string map inner message lookup",
+			query: "/messages_with_map/string_inner_map['key4']/inner_int",
+			want:  []any{int32(1)},
 		},
 		{
 			name:  "missing key lookup",
@@ -333,11 +453,6 @@ func TestFindAllMaps(t *testing.T) {
 			name:  "bool key lookup on a string-string map",
 			query: "/messages/with_map/string_string_map[true]",
 			want:  []any{},
-		},
-		{
-			name:  "string map inner message lookup",
-			query: "/messages_with_map/string_inner_map['key4']/inner_int",
-			want:  []any{int32(1)},
 		},
 	}
 

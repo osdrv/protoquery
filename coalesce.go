@@ -20,6 +20,13 @@ func toFloat64(v any) (float64, error) {
 
 func castToProtoreflectKind(v any, kind protoreflect.Kind) (any, bool) {
 	switch v.(type) {
+	case bool:
+		switch kind {
+		case protoreflect.BoolKind:
+			return v, true
+		default:
+			return nil, false
+		}
 	case string:
 		switch kind {
 		case protoreflect.StringKind:
