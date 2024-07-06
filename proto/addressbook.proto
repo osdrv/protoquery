@@ -1,6 +1,6 @@
 syntax = "proto3";
 package protoquery;
-option go_package = "osdrv/protoquery/pkg/protogen";
+option go_package = "osdrv/protoquery/pkg/proto";
 
 import "google/protobuf/timestamp.proto";
 

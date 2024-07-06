@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package protoquery;
-option go_package = "osdrv/protoquery/pkg/protogen";
+option go_package = "osdrv/protoquery/pkg/proto";
 
 message MessageWithMapHolder {
     repeated MessageWithMap messages_with_map = 1;
