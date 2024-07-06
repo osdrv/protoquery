@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package protoquery;
-option go_package = "osdrv/protoquery";
+option go_package = "osdrv/protoquery/pkg/protogen";
 
 message RepeatedScalarHolder {
     repeated RepeatedScalarsItem items = 1;

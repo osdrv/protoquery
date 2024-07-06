@@ -2,11 +2,12 @@ package protoquery
 
 import (
 	"errors"
+	"osdrv/protoquery/pkg/protogen"
 	"testing"
 )
 
 func TestExpressionType(t *testing.T) {
-	msg := &Book{
+	msg := &protogen.Book{
 		Title:  "The Go Programming Language",
 		Author: "Alan A. A. Donovan",
 		Price:  42.99,
@@ -131,13 +132,13 @@ func TestExpressionType(t *testing.T) {
 }
 
 func TestExpressionEval(t *testing.T) {
-	msg := &Book{
+	msg := &protogen.Book{
 		Title:  "The Go Programming Language",
 		Author: "Alan A. A. Donovan",
 		Price:  42.99,
 	}
 
-	msgEmpty := &Book{}
+	msgEmpty := &protogen.Book{}
 
 	tests := []struct {
 		name    string

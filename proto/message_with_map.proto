@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package protoquery;
-option go_package = "osdrv/protoquery";
+option go_package = "osdrv/protoquery/pkg/protogen";
 
 message MessageWithMapHolder {
     repeated MessageWithMap messages_with_map = 1;
@@ -33,5 +33,16 @@ message MessageWithMap {
         repeated int32 inner_arr = 3;
     }
 
-    map<string, InnerMessage> string_inner_map = 19;
+    map<int32, InnerMessage> int32_inner_map = 19;
+    map<int64, InnerMessage> int64_inner_map = 20;
+    map<uint32, InnerMessage> uint32_inner_map = 21;
+    map<uint64, InnerMessage> uint64_inner_map = 22;
+    map<sint32, InnerMessage> sint32_inner_map = 23;
+    map<sint64, InnerMessage> sint64_inner_map = 24;
+    map<fixed32, InnerMessage> fixed32_inner_map = 25;
+    map<fixed64, InnerMessage> fixed64_inner_map = 26;
+    map<sfixed32, InnerMessage> sfixed32_inner_map = 27;
+    map<sfixed64, InnerMessage> sfixed64_inner_map = 28;
+    map<bool, InnerMessage> bool_inner_map = 29;
+    map<string, InnerMessage> string_inner_map = 30;
 }

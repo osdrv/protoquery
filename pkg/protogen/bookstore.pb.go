@@ -4,7 +4,7 @@
 // 	protoc        v5.27.0
 // source: proto/bookstore.proto
 
-package protoquery
+package protogen
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"

@@ -204,9 +204,6 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 						descr: head.descr.MapValue(),
 					})
 				}
-
-				//} else if isMessage(head.ptr) {
-
 			} else if isBytes(head.ptr) {
 				ctx := NewEvalContext(head.ptr)
 				typ, err := ks.expr.Type(ctx)

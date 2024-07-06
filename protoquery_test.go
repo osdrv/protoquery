@@ -1,12 +1,13 @@
 package protoquery
 
 import (
+	"osdrv/protoquery/pkg/protogen"
 	"testing"
 )
 
 func TestFindAllAttributeAccess(t *testing.T) {
-	store := Bookstore{
-		Books: []*Book{
+	store := protogen.Bookstore{
+		Books: []*protogen.Book{
 			{
 				Title:  "The Go Programming Language",
 				Author: "Alan A. A. Donovan",
@@ -70,8 +71,8 @@ func TestFindAllAttributeAccess(t *testing.T) {
 }
 
 func TestFindAllChilrenAccess(t *testing.T) {
-	store := Bookstore{
-		Books: []*Book{
+	store := protogen.Bookstore{
+		Books: []*protogen.Book{
 			{
 				Title:  "The Go Programming Language",
 				Author: "Alan A. A. Donovan",
@@ -163,8 +164,8 @@ func TestFindAllChilrenAccess(t *testing.T) {
 }
 
 func TestFindAllRepeatedScalars(t *testing.T) {
-	holder := RepeatedScalarHolder{
-		Items: []*RepeatedScalarsItem{
+	holder := protogen.RepeatedScalarHolder{
+		Items: []*protogen.RepeatedScalarsItem{
 			{
 				Int32S:  []int32{1, 2, 3},
 				Int64S:  []int64{1, 2, 3},
@@ -289,15 +290,15 @@ func TestFindAllRepeatedScalars(t *testing.T) {
 }
 
 func TestFindAllMaps(t *testing.T) {
-	messages := &MessageWithMapHolder{
-		MessagesWithMap: []*MessageWithMap{
+	messages := &protogen.MessageWithMapHolder{
+		MessagesWithMap: []*protogen.MessageWithMap{
 			{
 				StringStringMap: map[string]string{
 					"key1": "value1",
 					"key2": "value2",
 					"key3": "value3",
 				},
-				StringInnerMap: map[string]*MessageWithMap_InnerMessage{
+				StringInnerMap: map[string]*protogen.MessageWithMap_InnerMessage{
 					"key4": {
 						InnerInt:    1,
 						InnerString: "string",
@@ -356,8 +357,8 @@ func TestFindAllMaps(t *testing.T) {
 }
 
 func TestFindAllListBuiltins(t *testing.T) {
-	store := Bookstore{
-		Books: []*Book{
+	store := protogen.Bookstore{
+		Books: []*protogen.Book{
 			{
 				Title:  "The Go Programming Language",
 				Author: "Alan A. A. Donovan",

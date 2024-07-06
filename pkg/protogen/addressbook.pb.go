@@ -4,7 +4,7 @@
 // 	protoc        v4.25.3
 // source: proto/addressbook.proto
 
-package protoquery
+package protogen
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"

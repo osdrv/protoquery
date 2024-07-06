@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package protoquery;
-option go_package = "osdrv/protoquery";
+option go_package = "osdrv/protoquery/pkg/protogen";
 
 // This proto file defines a bookstore message with a repeated book message.
 // Each book message has a title, an author and a price.
