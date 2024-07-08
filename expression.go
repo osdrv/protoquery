@@ -15,6 +15,18 @@ const (
 	TypeString
 	TypeInt
 	TypeFloat
+	TypeEnum
+)
+
+var (
+	TypeToStr = map[Type]string{
+		TypeUnknown: "unknown",
+		TypeBool:    "bool",
+		TypeString:  "string",
+		TypeInt:     "int",
+		TypeFloat:   "float",
+		TypeEnum:    "enum",
+	}
 )
 
 type Operator uint8
@@ -164,6 +176,13 @@ func (p *PropertyExpr) Eval(ctx EvalContext) (any, error) {
 		if ctx.Options().EnforceBool {
 			return msg.Has(fd), nil
 		}
+		// Enums are special case, we need to return the name of the enum value.
+		if fd.Kind() == protoreflect.EnumKind {
+			ed := fd.Enum()
+			values := ed.Values()
+			ival := msg.Get(fd).Enum()
+			return string(values.Get(int(ival)).Name()), nil
+		}
 		if msg.Has(fd) {
 			return msg.Get(fd).Interface(), nil
 		} else if ctx.Options().UseDefault {
@@ -197,6 +216,8 @@ func (p *PropertyExpr) Type(ctx EvalContext) (Type, error) {
 		return TypeInt, nil
 	case protoreflect.FloatKind, protoreflect.DoubleKind:
 		return TypeFloat, nil
+	case protoreflect.EnumKind:
+		return TypeEnum, nil
 	}
 	return TypeUnknown, fmt.Errorf("Unknown field type %v", fd.Kind())
 }
@@ -347,6 +368,9 @@ func typesCompatible(a, b Type) bool {
 	if a == TypeInt && b == TypeFloat {
 		return true
 	}
+	if a == TypeString && b == TypeEnum {
+		return true
+	}
 
 	return false
 }
@@ -361,7 +385,7 @@ func (b *BinaryExpr) Eval(ctx EvalContext) (any, error) {
 		return nil, rerr
 	}
 	if !typesCompatible(ltyp, rtyp) {
-		return nil, fmt.Errorf("Type mismatch(%v Vs %v)", ltyp, rtyp)
+		return nil, fmt.Errorf("Type mismatch(%v Vs %v)", TypeToStr[ltyp], TypeToStr[rtyp])
 	}
 	switch b.op {
 	case OpEq, OpNe:
@@ -372,8 +396,10 @@ func (b *BinaryExpr) Eval(ctx EvalContext) (any, error) {
 			return stringBinEval(ctx.Copy(WithUseDefault(true)), b.left, b.right, b.op)
 		case TypeBool:
 			return boolBinEval(ctx.Copy(WithUseDefault(true)), b.left, b.right, b.op)
+		case TypeEnum:
+			return enumBinEval(ctx.Copy(WithUseDefault(true)), b.left, b.right, b.op)
 		default:
-			return nil, fmt.Errorf("Invalid type %v for + operator", ltyp)
+			return nil, fmt.Errorf("Invalid type `%v` for `=` operator", TypeToStr[ltyp])
 		}
 	case OpPlus, OpLt, OpLe, OpGt, OpGe:
 		switch ltyp {
@@ -582,6 +608,41 @@ func boolBinEval(ctx EvalContext, a, b Expression, op Operator) (any, error) {
 		return av.(bool) != bv.(bool), nil
 	default:
 		return nil, fmt.Errorf("Invalid operator %v", op)
+	}
+}
+
+func enumBinEval(ctx EvalContext, a, b Expression, op Operator) (any, error) {
+	atyp, aerr := a.Type(ctx)
+	if aerr != nil {
+		return nil, aerr
+	}
+	av, err := a.Eval(ctx)
+	if err != nil {
+		return nil, err
+	}
+	btyp, berr := b.Type(ctx)
+	if berr != nil {
+		return nil, berr
+	}
+	bv, err := b.Eval(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if atyp != btyp {
+		if astr, ok := av.(fmt.Stringer); ok {
+			av = astr.String()
+		}
+		if bstr, ok := bv.(fmt.Stringer); ok {
+			bv = bstr.String()
+		}
+	}
+	switch op {
+	case OpEq:
+		return av == bv, nil
+	case OpNe:
+		return av != bv, nil
+	default:
+		return nil, fmt.Errorf("Invalid operator %v for enum", op)
 	}
 }
 

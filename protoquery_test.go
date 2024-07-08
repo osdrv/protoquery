@@ -536,3 +536,47 @@ func TestFindAllListBuiltins(t *testing.T) {
 		})
 	}
 }
+
+func TestFindAllEnum(t *testing.T) {
+	holder := &proto.MessageWithEnumHolder{
+		Messages: []*proto.MessageWithEnum{
+			{
+				EnumField:   proto.MessageWithEnum_ENUM1,
+				StringField: "message with enum1",
+			},
+			{
+				EnumField:   proto.MessageWithEnum_ENUM2,
+				StringField: "message with enum2",
+			},
+			{
+				EnumField:   proto.MessageWithEnum_ENUM3,
+				StringField: "message with enum3",
+			},
+		},
+	}
+	tests := []struct {
+		name  string
+		query string
+		want  []any
+	}{
+		{
+			name:  "single enum selector",
+			query: "/messages[@enum_field = 'ENUM1']",
+			want:  []any{holder.Messages[0]},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pq, err := Compile(tt.query)
+			if err != nil {
+				t.Errorf("Compile() error = %v, no error expected", err)
+				return
+			}
+			res := pq.FindAll(holder)
+			if !deepEqual(res, tt.want) {
+				t.Errorf("Compile() = %+v, want %+v", res, tt.want)
+			}
+		})
+	}
+}

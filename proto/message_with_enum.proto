@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package protoquery;
+option go_package = "osdrv/protoquery/pkg/proto";
+
+message MessageWithEnumHolder {
+    repeated MessageWithEnum messages = 1;
+}
+
+message MessageWithEnum {
+    enum Enum {
+        ENUM1 = 0;
+        ENUM2 = 1;
+        ENUM3 = 2;
+    }
+    Enum enum_field = 1;
+    string string_field = 2;
+}
