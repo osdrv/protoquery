@@ -552,6 +552,26 @@ func TestFindAllEnum(t *testing.T) {
 				EnumField:   proto.MessageWithEnum_ENUM3,
 				StringField: "message with enum3",
 			},
+			{
+				// Unset enum would be evaluated to the default int
+				// value which is 0. I.e. An unset enum is trivially
+				// equal to the first enum value.
+				StringField: "message with empty enum",
+			},
+		},
+		MessagesWithAlias: []*proto.MessageWithAllowAliasEnum{
+			{
+				EnumField:   proto.MessageWithAllowAliasEnum_ENUM1,
+				StringField: "message with enum1",
+			},
+			{
+				EnumField:   proto.MessageWithAllowAliasEnum_ENUM2,
+				StringField: "message with enum2",
+			},
+			{
+				EnumField:   proto.MessageWithAllowAliasEnum_ENUM3,
+				StringField: "message with enum3 (alias enum2)",
+			},
 		},
 	}
 	tests := []struct {
@@ -562,7 +582,7 @@ func TestFindAllEnum(t *testing.T) {
 		{
 			name:  "single enum selector",
 			query: "/messages[@enum_field = 'ENUM1']",
-			want:  []any{holder.Messages[0]},
+			want:  []any{holder.Messages[0], holder.Messages[3]},
 		},
 		{
 			name:  "single enum selector",
@@ -582,7 +602,17 @@ func TestFindAllEnum(t *testing.T) {
 		{
 			name:  "select enum values",
 			query: "/messages/enum_field",
-			want:  []any{"ENUM1", "ENUM2", "ENUM3"},
+			want:  []any{"ENUM1", "ENUM2", "ENUM3", "ENUM1"},
+		},
+		{
+			name:  "select enum values with alias",
+			query: "/messages_with_alias[@enum_field = 'ENUM2']",
+			want:  []any{holder.MessagesWithAlias[1]},
+		},
+		{
+			name:  "select enum values with alias",
+			query: "/messages_with_alias[@enum_field = 'ALIAS_ENUM2']",
+			want:  []any{holder.MessagesWithAlias[2]},
 		},
 	}
 
