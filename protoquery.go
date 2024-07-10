@@ -91,9 +91,16 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 				if !ok {
 					continue
 				}
+				val := msg.Get(fd)
+				if fd.Kind() == protoreflect.EnumKind {
+					ed := fd.Enum()
+					values := ed.Values()
+					ival := msg.Get(fd).Enum()
+					val = protoreflect.ValueOfString(string(values.Get(int(ival)).Name()))
+				}
 				queue = append(queue, queueItem{
 					qix:   head.qix + 1,
-					ptr:   msg.Get(fd),
+					ptr:   val,
 					descr: fd,
 				})
 			}

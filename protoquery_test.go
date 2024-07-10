@@ -564,6 +564,26 @@ func TestFindAllEnum(t *testing.T) {
 			query: "/messages[@enum_field = 'ENUM1']",
 			want:  []any{holder.Messages[0]},
 		},
+		{
+			name:  "single enum selector",
+			query: "/messages[@enum_field = 'ENUM2']",
+			want:  []any{holder.Messages[1]},
+		},
+		{
+			name:  "single enum selector",
+			query: "/messages[@enum_field = 'ENUM3']",
+			want:  []any{holder.Messages[2]},
+		},
+		{
+			name:  "single enum selector with a non-existing enum value",
+			query: "/messages[@enum_field = 'ENUM4']",
+			want:  []any{},
+		},
+		{
+			name:  "select enum values",
+			query: "/messages/enum_field",
+			want:  []any{"ENUM1", "ENUM2", "ENUM3"},
+		},
 	}
 
 	for _, tt := range tests {
