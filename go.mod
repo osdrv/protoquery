@@ -1,4 +1,4 @@
-module osdrv/protoquery
+module github.com/osdrv/protoquery
 
 go 1.22.1
 
