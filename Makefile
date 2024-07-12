@@ -2,7 +2,10 @@
 
 # make command to run tests
 test:
-	@echo "Running tests..."
+	@go test ./...
+
+test-v:
+	@echo "Running tests with verbose output..."
 	@go test -v ./...
 
 # make command to run tests with coverage

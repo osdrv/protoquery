@@ -242,6 +242,36 @@ func TestCompileQuery(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "path with a root recursive descent operator",
+			input: []*Token{
+				NewToken("//", TokenSlashSlash),
+				NewToken("node", TokenNode),
+			},
+			want: Query{
+				&RecursiveDescentQueryStep{},
+				&NodeQueryStep{
+					name: "node",
+				},
+			},
+		},
+		{
+			name: "path with a middle-sitter recursive descent operator",
+			input: []*Token{
+				NewToken("node", TokenNode),
+				NewToken("//", TokenSlashSlash),
+				NewToken("ancestor", TokenNode),
+			},
+			want: Query{
+				&NodeQueryStep{
+					name: "node",
+				},
+				&RecursiveDescentQueryStep{},
+				&NodeQueryStep{
+					name: "ancestor",
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

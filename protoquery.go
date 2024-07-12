@@ -30,25 +30,66 @@ type queueItem struct {
 	descr protoreflect.FieldDescriptor
 }
 
-func flatten(val protoreflect.Value) []interface{} {
-	res := []interface{}{}
-	switch val.Interface().(type) {
-	case protoreflect.Message:
-		res = append(res, val.Message().Interface())
-	case protoreflect.List:
-		list := val.List()
-		for i := 0; i < list.Len(); i++ {
-			res = append(res, flatten(list.Get(i))...)
+func nameMatch(n protoreflect.Name, f string) bool {
+	return f == "*" || string(n) == f
+}
+
+func matchMsgFields(m protoreflect.Message, f string) []protoreflect.FieldDescriptor {
+	res := []protoreflect.FieldDescriptor{}
+	ff := m.Interface().ProtoReflect().Descriptor().Fields()
+	for i := 0; i < ff.Len(); i++ {
+		if nameMatch(ff.Get(i).Name(), f) {
+			res = append(res, ff.Get(i))
 		}
-	default:
-		// giving up, returning the value as is
-		res = append(res, val.Interface())
 	}
 	return res
 }
 
-func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
-	res := []interface{}{}
+func enumStr(fd protoreflect.FieldDescriptor, v protoreflect.Value) (string, bool) {
+	ed := fd.Enum()
+	vv := ed.Values()
+	i := int(v.Enum())
+	if i >= 0 && i < vv.Len() {
+		return string(vv.Get(i).Name()), true
+	}
+	return "", false
+}
+
+// flat return a flat list of value(s). If the value is a message, it returns a list with the only element.
+// If the value is a list, it its elements.
+// The function performs validity check on the value.
+func flat(v protoreflect.Value) []protoreflect.Value {
+	res := []protoreflect.Value{}
+	if isList(v) {
+		for i := 0; i < v.List().Len(); i++ {
+			if vv := v.List().Get(i); vv.IsValid() {
+				res = append(res, v.List().Get(i))
+			}
+		}
+	} else {
+		if v.IsValid() {
+			res = append(res, v)
+		}
+	}
+
+	return res
+}
+
+// stripProto returns the underlying Go value of the protoreflect.Value.
+func stripProto(v protoreflect.Value) any {
+	if !v.IsValid() {
+		return nil
+	}
+	switch v.Interface().(type) {
+	case protoreflect.Message:
+		return v.Message().Interface()
+	default:
+		return v.Interface()
+	}
+}
+
+func (pq *ProtoQuery) FindAll(root proto.Message) []any {
+	res := []any{}
 	if root == nil {
 		return res
 	}
@@ -60,7 +101,9 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 	for len(queue) > 0 {
 		head, queue = queue[0], queue[1:]
 		if head.qix >= len(pq.query) {
-			res = append(res, flatten(head.ptr)...)
+			for _, v := range flat(head.ptr) {
+				res = append(res, stripProto(v))
+			}
 			continue
 		}
 		step := pq.query[head.qix]
@@ -74,35 +117,21 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []interface{} {
 			})
 		case NodeQueryStepKind:
 			debugf("Node step: %s", step)
-			cs := []protoreflect.Value{}
-			if isList(head.ptr) {
-				for i := 0; i < head.ptr.List().Len(); i++ {
-					cs = append(cs, head.ptr.List().Get(i))
-				}
-			} else {
-				cs = append(cs, head.ptr)
-			}
-			for _, c := range cs {
-				if !c.IsValid() {
-					continue
-				}
+			for _, c := range flat(head.ptr) {
 				msg := c.Message()
-				fd, ok := findFieldByName(msg.Interface(), step.(*NodeQueryStep).name)
-				if !ok {
-					continue
+				for _, fd := range matchMsgFields(msg, step.(*NodeQueryStep).name) {
+					val := msg.Get(fd)
+					if fd.Kind() == protoreflect.EnumKind {
+						if e, ok := enumStr(fd, val); ok {
+							val = protoreflect.ValueOfString(e)
+						}
+					}
+					queue = append(queue, queueItem{
+						qix:   head.qix + 1,
+						ptr:   val,
+						descr: fd,
+					})
 				}
-				val := msg.Get(fd)
-				if fd.Kind() == protoreflect.EnumKind {
-					ed := fd.Enum()
-					values := ed.Values()
-					ival := msg.Get(fd).Enum()
-					val = protoreflect.ValueOfString(string(values.Get(int(ival)).Name()))
-				}
-				queue = append(queue, queueItem{
-					qix:   head.qix + 1,
-					ptr:   val,
-					descr: fd,
-				})
 			}
 		case KeyQueryStepKind:
 			ks := step.(*KeyQueryStep)

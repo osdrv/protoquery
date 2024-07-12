@@ -1,3 +1,27 @@
+2024-07-12 - Recusrive descent lookup
+
+Implementing // path operator (SlashSlash).
+
+The algoritm is the following:
+Given a root node R and a recursive descent path in a form: "//P".
+    Note: Defining a root node A with a direct or indirect
+    descending node B and a path in a form "A//B" is trivially
+    equivalent to the statement above.
+The selector algoritm should perform a recursive descent traversal
+of the entire R node tree and collect all nodes (be it: messages,
+list elements, map values) matching the selector P.
+
+Consider the following node tree:
+R
+  - A
+    - B
+    - C
+      - D
+        - B
+  - B
+In this case the recursive descent selector must return all nodes
+matching B in total (expanded paths: R/A/B, R/A/C/D/B, R/B).
+
 2024-06-20 - Expression grammar
 
 Expressions could be of 3 types:
