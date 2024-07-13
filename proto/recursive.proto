@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package protoquery;
+option go_package = "osdrv/protoquery/pkg/proto";
+
+message Recursion {
+  string string_val = 1;
+  int32 int_val = 2;
+  repeated Recursion children = 3;
+}

@@ -1,3 +1,34 @@
+2024-07-13 - Avoid re-entring visited nodes
+
+Assume the following root message:
+
+R
+  - L: [ A, B, C ]
+
+Given a path: "//path", the root message visit sequence would be the following:
+
+Assume, the path matches B.
+
+0.  Schedule R with // {admit}
+1.  Visit R with // {from 0}
+2.  Schedule L with // {admit}
+3.  Schedule L with path {admit}
+4.  Visit L with // {from 2}
+5.  Schedule L with path {skip/3}
+6.  Schedule A with // {admit}
+7.  Schedule B with // {admit}
+8.  Schedule C with // {admit}
+9.  Visit L with path {from 3} -> yields B
+10. Visit A with // {from 6}
+11. Schedule A with path {admit}
+12. Visit B with // {from 7}
+13. Schedule B with path {admit}
+14. Visit C with // {from 8}
+15. Schedule C with path {admit}
+16. Visit A with path {from 10}
+17. Visit B with path {from 11} -> yields B
+18. Visit C with path {from 12}
+
 2024-07-12 - Recusrive descent lookup
 
 Implementing // path operator (SlashSlash).

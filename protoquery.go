@@ -1,6 +1,10 @@
 package protoquery
 
 import (
+	"fmt"
+	reflect "reflect"
+	"strings"
+
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
@@ -43,6 +47,16 @@ func matchMsgFields(m protoreflect.Message, f string) []protoreflect.FieldDescri
 		}
 	}
 	return res
+}
+
+func canRecurse(v protoreflect.Value) bool {
+	if v.IsValid() {
+		switch v.Interface().(type) {
+		case protoreflect.Message, protoreflect.List, protoreflect.Map:
+			return true
+		}
+	}
+	return false
 }
 
 func enumStr(fd protoreflect.FieldDescriptor, v protoreflect.Value) (string, bool) {
@@ -88,15 +102,93 @@ func stripProto(v protoreflect.Value) any {
 	}
 }
 
+type qmemkey struct {
+	qix  int
+	uptr uintptr
+}
+
+func printProtoVal(v protoreflect.Value) string {
+	if !v.IsValid() {
+		return "<invalid>"
+	}
+	if msg, ok := toMessage(v); ok {
+		var b strings.Builder
+		b.WriteString(string(msg.Descriptor().Name()))
+		b.WriteString("{")
+		for i := 0; i < msg.Descriptor().Fields().Len(); i++ {
+			fd := msg.Descriptor().Fields().Get(i)
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString(fmt.Sprintf("%s: %s", fd.Name(), printProtoVal(msg.Get(fd))))
+		}
+		b.WriteString("}")
+		return b.String()
+	} else if list, ok := toList(v); ok {
+		var b strings.Builder
+		b.WriteString("[")
+		for i := 0; i < list.Len(); i++ {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString(printProtoVal(list.Get(i)))
+		}
+		b.WriteString("]")
+		return b.String()
+	} else if mapv, ok := toMap(v); ok {
+		var b strings.Builder
+		b.WriteString("{")
+		mapv.Range(func(k protoreflect.MapKey, v protoreflect.Value) bool {
+			if b.Len() > 1 {
+				b.WriteString(", ")
+			}
+			b.WriteString(fmt.Sprintf("%s: %s", printProtoVal(k.Value()), printProtoVal(v)))
+			return true
+		})
+		b.WriteString("}")
+		return b.String()
+	} else {
+		return fmt.Sprintf("%v", v.Interface())
+	}
+}
+
 func (pq *ProtoQuery) FindAll(root proto.Message) []any {
+	debugf("Query: %s", pq.query)
+
 	res := []any{}
 	if root == nil {
 		return res
 	}
-	queue := []queueItem{{
+	queue := []queueItem{}
+
+	memo := make(map[qmemkey]bool)
+	appendUnique := func(q []queueItem, qi queueItem) []queueItem {
+		uptr := uintptr(reflect.ValueOf(qi.ptr).FieldByName("ptr").UnsafePointer())
+		k := qmemkey{
+			qix:  qi.qix,
+			uptr: uptr,
+		}
+		debugf("schedule map key: %+v", k)
+		if !memo[k] || uptr == 0 {
+			step := "<OoB>"
+			if qi.qix < len(pq.query) {
+				step = pq.query[qi.qix].String()
+			}
+			debugf("scheduled: %s step %s", printProtoVal(qi.ptr), step)
+			memo[k] = true
+			q = append(q, qi)
+			debugf("admitted %+v", k)
+		} else {
+			debugf("skipped: %+v", k)
+		}
+		return q
+	}
+
+	queue = appendUnique(queue, queueItem{
 		qix: 0,
 		ptr: protoreflect.ValueOf(root.ProtoReflect()),
-	}}
+	})
+
 	var head queueItem
 	for len(queue) > 0 {
 		head, queue = queue[0], queue[1:]
@@ -107,10 +199,13 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 			continue
 		}
 		step := pq.query[head.qix]
+		fmt.Println("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+		debugf("-> current pointer: %s", printProtoVal(head.ptr))
+		debugf("~> step: %s", step)
 		switch step.Kind() {
 		case RootQueryStepKind:
 			debugf("Root step: %s", step)
-			queue = append(queue, queueItem{
+			queue = appendUnique(queue, queueItem{
 				qix:   head.qix + 1,
 				ptr:   head.ptr,
 				descr: head.descr,
@@ -118,19 +213,20 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 		case NodeQueryStepKind:
 			debugf("Node step: %s", step)
 			for _, c := range flat(head.ptr) {
-				msg := c.Message()
-				for _, fd := range matchMsgFields(msg, step.(*NodeQueryStep).name) {
-					val := msg.Get(fd)
-					if fd.Kind() == protoreflect.EnumKind {
-						if e, ok := enumStr(fd, val); ok {
-							val = protoreflect.ValueOfString(e)
+				if msg, ok := toMessage(c); ok {
+					for _, fd := range matchMsgFields(msg, step.(*NodeQueryStep).name) {
+						val := msg.Get(fd)
+						if fd.Kind() == protoreflect.EnumKind {
+							if e, ok := enumStr(fd, val); ok {
+								val = protoreflect.ValueOfString(e)
+							}
 						}
+						queue = appendUnique(queue, queueItem{
+							qix:   head.qix + 1,
+							ptr:   val,
+							descr: fd,
+						})
 					}
-					queue = append(queue, queueItem{
-						qix:   head.qix + 1,
-						ptr:   val,
-						descr: fd,
-					})
 				}
 			}
 		case KeyQueryStepKind:
@@ -181,7 +277,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 						}
 					}
 					if tl.Len() > 0 {
-						queue = append(queue, queueItem{
+						queue = appendUnique(queue, queueItem{
 							qix:   head.qix + 1,
 							ptr:   protoreflect.ValueOf(tl),
 							descr: head.descr, // The type should not change: we are still in a list.
@@ -199,7 +295,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 						continue
 					}
 					if ix >= 0 && ix <= int64(list.Len()) {
-						queue = append(queue, queueItem{
+						queue = appendUnique(queue, queueItem{
 							qix: head.qix + 1,
 							ptr: list.Get(int(ix)),
 							// TODO(osdrv): type descriptor
@@ -234,7 +330,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 				exprval := protoreflect.ValueOf(k)
 				key := exprval.MapKey()
 				if mp.Has(key) {
-					queue = append(queue, queueItem{
+					queue = appendUnique(queue, queueItem{
 						qix:   head.qix + 1,
 						ptr:   mp.Get(key),
 						descr: head.descr.MapValue(),
@@ -263,7 +359,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 				}
 				bytes := head.ptr.Bytes()
 				if ix >= 0 && int(ix) < len(bytes) {
-					queue = append(queue, queueItem{
+					queue = appendUnique(queue, queueItem{
 						qix: head.qix + 1,
 						// protoreflect does not support any ints below 32bits, hence the type casting
 						ptr: protoreflect.ValueOf(uint32(bytes[ix])),
@@ -274,8 +370,72 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 				debugf("Key step: %s", step)
 				panic("TODO(osdrv): not implemented")
 			}
+		case RecursiveDescentQueryStepKind:
+			debugf("Recursive descent step: %s", step)
+			if msg, ok := toMessage(head.ptr); ok {
+				// test the message itself
+				queue = appendUnique(queue, queueItem{
+					qix:   head.qix + 1,
+					ptr:   head.ptr,
+					descr: head.descr,
+				})
+				// recurse over all the fields
+				for _, fd := range matchMsgFields(msg, "*") {
+					if canRecurse(msg.Get(fd)) {
+						// preserve the recursive descent query step
+						queue = appendUnique(queue, queueItem{
+							qix:   head.qix,
+							ptr:   msg.Get(fd),
+							descr: fd,
+						})
+					}
+					// progress 1 query step forward (drop recursion)
+					// queue = appendUnique(queue, queueItem{
+					// 	qix:   head.qix + 1,
+					// 	ptr:   msg.Get(fd),
+					// 	descr: fd,
+					// })
+				}
+			} else if list, ok := toList(head.ptr); ok {
+				// progress 1 query step forward (drop recursion)
+				//queue = appendUnique(queue, queueItem{
+				//	qix:   head.qix + 1,
+				//	ptr:   head.ptr,
+				//	descr: head.descr,
+				//})
+				for i := 0; i < list.Len(); i++ {
+					if canRecurse(list.Get(i)) {
+						// preserve the recursive descent query step
+						queue = appendUnique(queue, queueItem{
+							qix:   head.qix,
+							ptr:   list.Get(i),
+							descr: head.descr,
+						})
+					}
+				}
+			} else if mp, ok := toMap(head.ptr); ok {
+				// progress 1 query step forward (drop recursion)
+				//queue = appendUnique(queue, queueItem{
+				//	qix:   head.qix + 1,
+				//	ptr:   head.ptr,
+				//	descr: head.descr,
+				//})
+				mp.Range(func(key protoreflect.MapKey, value protoreflect.Value) bool {
+					if canRecurse(value) {
+						// preserve the recursive descent query step
+						queue = appendUnique(queue, queueItem{
+							qix:   head.qix,
+							ptr:   value,
+							descr: head.descr.MapValue(),
+						})
+					}
+					return true
+				})
+			} else {
+				debugf("RecursiveDescentQuery is not implemented for %+v", head.ptr.Interface())
+			}
 		default:
-			panicf("Query step kind %+v is not supported", step.Kind())
+			panicf("Query step %q(kind=%v) is not supported", step.String(), step.Kind())
 		}
 	}
 	return res

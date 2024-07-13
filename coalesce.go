@@ -3,8 +3,63 @@ package protoquery
 import (
 	reflect "reflect"
 
+	"google.golang.org/protobuf/proto"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 )
+
+func toMessage(v protoreflect.Value) (protoreflect.Message, bool) {
+	if msg, ok := v.Interface().(protoreflect.Message); ok {
+		return msg, ok
+	}
+	return nil, false
+}
+
+func isMessage(v protoreflect.Value) bool {
+	_, ok := toMessage(v)
+	return ok
+}
+
+func toList(v protoreflect.Value) (protoreflect.List, bool) {
+	if list, ok := v.Interface().(protoreflect.List); ok {
+		return list, ok
+	}
+	return nil, false
+}
+
+func isList(v protoreflect.Value) bool {
+	_, ok := toList(v)
+	return ok
+}
+
+func toMap(v protoreflect.Value) (protoreflect.Map, bool) {
+	if list, ok := v.Interface().(protoreflect.Map); ok {
+		return list, ok
+	}
+	return nil, false
+}
+
+func isMap(v protoreflect.Value) bool {
+	_, ok := toMap(v)
+	return ok
+}
+
+func toBytes(v protoreflect.Value) ([]byte, bool) {
+	if bytes, ok := v.Interface().([]byte); ok {
+		return bytes, ok
+	}
+	return nil, false
+}
+
+func isBytes(v protoreflect.Value) bool {
+	_, ok := toBytes(v)
+	return ok
+}
+
+func findFieldByName(msg proto.Message, name string) (protoreflect.FieldDescriptor, bool) {
+	fields := msg.ProtoReflect().Descriptor().Fields()
+	fd := fields.ByName(protoreflect.Name(name))
+	return fd, fd != nil
+}
 
 func toBool(v any) (bool, error) {
 	return reflect.ValueOf(v).Bool(), nil

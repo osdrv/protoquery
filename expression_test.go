@@ -2,8 +2,9 @@ package protoquery
 
 import (
 	"errors"
-	"osdrv/protoquery/proto"
 	"testing"
+
+	"github.com/osdrv/protoquery/proto"
 )
 
 func TestExpressionType(t *testing.T) {

@@ -1,8 +1,9 @@
 package protoquery
 
 import (
-	"osdrv/protoquery/proto"
 	"testing"
+
+	"github.com/osdrv/protoquery/proto"
 )
 
 func TestFindAllAttributeAccess(t *testing.T) {
@@ -24,7 +25,6 @@ func TestFindAllAttributeAccess(t *testing.T) {
 			},
 		},
 	}
-
 	tests := []struct {
 		name    string
 		query   string
@@ -64,7 +64,7 @@ func TestFindAllAttributeAccess(t *testing.T) {
 			}
 			res := pq.FindAll(&store)
 			if !deepEqual(res, tt.want) {
-				t.Errorf("Compile() = %+v, want %+v", res, tt.want)
+				t.Errorf("FindAll() = %+v, want %+v", res, tt.want)
 			}
 		})
 	}
@@ -157,7 +157,7 @@ func TestFindAllChilrenAccess(t *testing.T) {
 			}
 			res := pq.FindAll(&store)
 			if !deepEqual(res, tt.want) {
-				t.Errorf("Compile() = %+v, want %+v", res, tt.want)
+				t.Errorf("FindAll() = %+v, want %+v", res, tt.want)
 			}
 		})
 	}
@@ -283,7 +283,7 @@ func TestFindAllRepeatedScalars(t *testing.T) {
 			}
 			res := pq.FindAll(&holder)
 			if !deepEqual(res, tt.want) {
-				t.Errorf("Compile() = %+v, want %+v", res, tt.want)
+				t.Errorf("FindAll() = %+v, want %+v", res, tt.want)
 			}
 		})
 	}
@@ -465,7 +465,7 @@ func TestFindAllMapAccess(t *testing.T) {
 			}
 			res := pq.FindAll(messages)
 			if !deepEqual(res, tt.want) {
-				t.Errorf("Compile() = %+v, want %+v", res, tt.want)
+				t.Errorf("FindAll() = %+v, want %+v", res, tt.want)
 			}
 		})
 	}
@@ -531,7 +531,7 @@ func TestFindAllListBuiltins(t *testing.T) {
 			}
 			res := pq.FindAll(&store)
 			if !deepEqual(res, tt.want) {
-				t.Errorf("Compile() = %+v, want %+v", res, tt.want)
+				t.Errorf("FindAll() = %+v, want %+v", res, tt.want)
 			}
 		})
 	}
@@ -625,7 +625,69 @@ func TestFindAllEnum(t *testing.T) {
 			}
 			res := pq.FindAll(holder)
 			if !deepEqual(res, tt.want) {
-				t.Errorf("Compile() = %+v, want %+v", res, tt.want)
+				t.Errorf("FindAll() = %+v, want %+v", res, tt.want)
+			}
+		})
+	}
+}
+
+func TestFindAllRecursiveDescent(t *testing.T) {
+	tree := &proto.Recursion{
+		Children: []*proto.Recursion{
+			{
+				StringVal: "A",
+				Children: []*proto.Recursion{
+					{
+						StringVal: "B",
+						IntVal:    2,
+					},
+					{
+						StringVal: "C",
+						Children: []*proto.Recursion{
+							{
+								StringVal: "D",
+								Children: []*proto.Recursion{
+									{
+										StringVal: "B",
+										IntVal:    3,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			{
+				StringVal: "B",
+				IntVal:    1,
+			},
+		},
+		StringVal: "R",
+		IntVal:    0,
+	}
+
+	tests := []struct {
+		name  string
+		query string
+		want  []any
+	}{
+		{
+			name:  "recursively collect matching node values",
+			query: "//children[@string_val='B']/int_val",
+			want:  []any{int32(1), int32(2), int32(3)},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pq, err := Compile(tt.query)
+			if err != nil {
+				t.Errorf("Compile() error = %v, no error expected", err)
+				return
+			}
+			res := pq.FindAll(tree)
+			if !deepEqual(res, tt.want) {
+				t.Errorf("FindAll() = %+v, want %+v", res, tt.want)
 			}
 		})
 	}
