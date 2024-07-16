@@ -1,9 +1,7 @@
 package protoquery
 
 import (
-	"fmt"
 	reflect "reflect"
-	"strings"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -107,51 +105,6 @@ type qmemkey struct {
 	uptr uintptr
 }
 
-func printProtoVal(v protoreflect.Value) string {
-	if !v.IsValid() {
-		return "<invalid>"
-	}
-	if msg, ok := toMessage(v); ok {
-		var b strings.Builder
-		b.WriteString(string(msg.Descriptor().Name()))
-		b.WriteString("{")
-		for i := 0; i < msg.Descriptor().Fields().Len(); i++ {
-			fd := msg.Descriptor().Fields().Get(i)
-			if i > 0 {
-				b.WriteString(", ")
-			}
-			b.WriteString(fmt.Sprintf("%s: %s", fd.Name(), printProtoVal(msg.Get(fd))))
-		}
-		b.WriteString("}")
-		return b.String()
-	} else if list, ok := toList(v); ok {
-		var b strings.Builder
-		b.WriteString("[")
-		for i := 0; i < list.Len(); i++ {
-			if i > 0 {
-				b.WriteString(", ")
-			}
-			b.WriteString(printProtoVal(list.Get(i)))
-		}
-		b.WriteString("]")
-		return b.String()
-	} else if mapv, ok := toMap(v); ok {
-		var b strings.Builder
-		b.WriteString("{")
-		mapv.Range(func(k protoreflect.MapKey, v protoreflect.Value) bool {
-			if b.Len() > 1 {
-				b.WriteString(", ")
-			}
-			b.WriteString(fmt.Sprintf("%s: %s", printProtoVal(k.Value()), printProtoVal(v)))
-			return true
-		})
-		b.WriteString("}")
-		return b.String()
-	} else {
-		return fmt.Sprintf("%v", v.Interface())
-	}
-}
-
 func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 	debugf("Query: %s", pq.query)
 
@@ -168,7 +121,9 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 			qix:  qi.qix,
 			uptr: uptr,
 		}
-		debugf("schedule map key: %+v", k)
+		if DEBUG {
+			debugf("schedule map key: %+v", k)
+		}
 		if uptr == 0 || !canRecurse(qi.ptr) || !memo[k] {
 			step := "<OoB>"
 			if qi.qix < len(pq.query) {
@@ -199,9 +154,10 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 			continue
 		}
 		step := pq.query[head.qix]
-		fmt.Println("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-		debugf("-> current pointer: %s", printProtoVal(head.ptr))
-		debugf("~> step: %s", step)
+		if DEBUG {
+			debugf("-> current pointer: %s", printProtoVal(head.ptr))
+			debugf("~> step: %s", step)
+		}
 		switch step.Kind() {
 		case RootQueryStepKind:
 			debugf("Root step: %s", step)
