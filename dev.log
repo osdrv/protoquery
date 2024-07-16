@@ -29,6 +29,8 @@ Assume, the path matches B.
 17. Visit B with path {from 11} -> yields B
 18. Visit C with path {from 12}
 
+The problem is in this double dispatch leading to a duplicated B in the response.
+
 2024-07-12 - Recusrive descent lookup
 
 Implementing // path operator (SlashSlash).

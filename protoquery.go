@@ -169,7 +169,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 			uptr: uptr,
 		}
 		debugf("schedule map key: %+v", k)
-		if !memo[k] || uptr == 0 {
+		if uptr == 0 || !canRecurse(qi.ptr) || !memo[k] {
 			step := "<OoB>"
 			if qi.qix < len(pq.query) {
 				step = pq.query[qi.qix].String()
@@ -231,9 +231,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 			}
 		case KeyQueryStepKind:
 			ks := step.(*KeyQueryStep)
-			if isList(head.ptr) {
-				list := head.ptr.List()
-				ctx := NewEvalContext(list)
+			if list, ok := toList(head.ptr); ok {
 				// TODO(osdrv): we can pre-compute this as a property of the query
 				// rather than re-computing it on the go.
 				// isAllPropertyExprs would check if the key only consists of
@@ -243,7 +241,8 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 				// TODO(osdrv): all props + bool checks is still boolean.
 				// E.g. [@foo && @bar='value' && true]
 				enforceBool := isAllPropertyExprs(ks.expr)
-				ctx = ctx.Copy(WithEnforceBool(enforceBool))
+				ctx := NewEvalContext(list, WithEnforceBool(enforceBool))
+				//ctx = ctx.Copy(WithEnforceBool(enforceBool))
 				typ, err := ks.expr.Type(ctx)
 				if err != nil {
 					debugf("keyStep.Type(list) returned an error: %s", err)
@@ -305,8 +304,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 					debugf("keyStep.Type(list) returned an unsupported type: %s", typ)
 					continue
 				}
-			} else if isMap(head.ptr) {
-				mp := head.ptr.Map()
+			} else if mp, ok := toMap(head.ptr); ok {
 				ctx := NewEvalContext(mp)
 				k, err := ks.expr.Eval(ctx)
 				if err != nil {
@@ -336,7 +334,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 						descr: head.descr.MapValue(),
 					})
 				}
-			} else if isBytes(head.ptr) {
+			} else if bytes, ok := toBytes(head.ptr); ok {
 				ctx := NewEvalContext(head.ptr)
 				typ, err := ks.expr.Type(ctx)
 				if err != nil {
@@ -357,7 +355,6 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 					debugf("keyStep.Eval(bytes) returned an error on toInt64: %s", err)
 					continue
 				}
-				bytes := head.ptr.Bytes()
 				if ix >= 0 && int(ix) < len(bytes) {
 					queue = appendUnique(queue, queueItem{
 						qix: head.qix + 1,
@@ -371,7 +368,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 				panic("TODO(osdrv): not implemented")
 			}
 		case RecursiveDescentQueryStepKind:
-			debugf("Recursive descent step: %s", step)
+			//debugf("Recursive descent step: %s", step)
 			if msg, ok := toMessage(head.ptr); ok {
 				// test the message itself
 				queue = appendUnique(queue, queueItem{

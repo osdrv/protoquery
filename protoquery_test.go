@@ -600,7 +600,7 @@ func TestFindAllEnum(t *testing.T) {
 			want:  []any{},
 		},
 		{
-			name:  "select enum values",
+			name:  "select enum values failing",
 			query: "/messages/enum_field",
 			want:  []any{"ENUM1", "ENUM2", "ENUM3", "ENUM1"},
 		},
@@ -675,6 +675,16 @@ func TestFindAllRecursiveDescent(t *testing.T) {
 			name:  "recursively collect matching node values",
 			query: "//children[@string_val='B']/int_val",
 			want:  []any{int32(1), int32(2), int32(3)},
+		},
+		//{
+		//	name:  "intermediate recursive descent with no explicit node step",
+		//	query: "/children//[@string_val='B']/int_val",
+		//	want:  []any{int32(1), int32(2), int32(3)},
+		//},
+		{
+			name:  "intermediate recursive descent with an explicit node step",
+			query: "/children//children[@string_val='B']/int_val",
+			want:  []any{int32(2), int32(3)},
 		},
 	}
 
