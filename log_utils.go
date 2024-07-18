@@ -2,14 +2,9 @@ package protoquery
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-)
-
-var (
-	DEBUG = os.Getenv("DEBUG") != ""
 )
 
 func debugf(format string, args ...interface{}) {

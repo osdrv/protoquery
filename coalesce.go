@@ -1,6 +1,7 @@
 package protoquery
 
 import (
+	"fmt"
 	reflect "reflect"
 
 	"google.golang.org/protobuf/proto"
@@ -62,15 +63,34 @@ func findFieldByName(msg proto.Message, name string) (protoreflect.FieldDescript
 }
 
 func toBool(v any) (bool, error) {
-	return reflect.ValueOf(v).Bool(), nil
+	if rv := reflect.ValueOf(v); rv.Kind() == reflect.Bool {
+		return rv.Bool(), nil
+	}
+	return false, fmt.Errorf("not a bool: %v", v)
+}
+
+func isIntKind(rv reflect.Value) bool {
+	k := rv.Kind()
+	return k == reflect.Int || k == reflect.Int8 || k == reflect.Int16 || k == reflect.Int32 || k == reflect.Int64
 }
 
 func toInt64(v any) (int64, error) {
-	return reflect.ValueOf(v).Int(), nil
+	if rv := reflect.ValueOf(v); isIntKind(rv) {
+		return rv.Int(), nil
+	}
+	return 0, fmt.Errorf("not an int: %v", v)
+}
+
+func isFloatKind(rv reflect.Value) bool {
+	k := rv.Kind()
+	return k == reflect.Float32 || k == reflect.Float64
 }
 
 func toFloat64(v any) (float64, error) {
-	return reflect.ValueOf(v).Float(), nil
+	if rv := reflect.ValueOf(v); isFloatKind(rv) {
+		return rv.Float(), nil
+	}
+	return 0, fmt.Errorf("not a float: %v", v)
 }
 
 func castToProtoreflectKind(v any, kind protoreflect.Kind) (any, bool) {

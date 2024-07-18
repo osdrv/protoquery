@@ -1,6 +1,7 @@
 package protoquery
 
 import (
+	"os"
 	reflect "reflect"
 
 	"google.golang.org/protobuf/proto"
@@ -11,6 +12,22 @@ type ProtoQuery struct {
 	query Query
 }
 
+// queueItem is an internal structure to keep track of the moving multi-head pointer.
+type queueItem struct {
+	qix   int
+	ptr   protoreflect.Value
+	descr protoreflect.FieldDescriptor
+}
+
+type qmemkey struct {
+	qix  int
+	uptr uintptr
+}
+
+var (
+	DEBUG = os.Getenv("DEBUG") != ""
+)
+
 func Compile(q string) (*ProtoQuery, error) {
 	tokens, err := tokenizeXPathQuery(q)
 	if err != nil {
@@ -20,16 +37,7 @@ func Compile(q string) (*ProtoQuery, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ProtoQuery{
-		query: query,
-	}, nil
-}
-
-// queueItem is an internal structure to keep track of the moving multi-head pointer.
-type queueItem struct {
-	qix   int
-	ptr   protoreflect.Value
-	descr protoreflect.FieldDescriptor
+	return &ProtoQuery{query: query}, nil
 }
 
 func nameMatch(n protoreflect.Name, f string) bool {
@@ -100,22 +108,14 @@ func stripProto(v protoreflect.Value) any {
 	}
 }
 
-type qmemkey struct {
-	qix  int
-	uptr uintptr
-}
-
-func (pq *ProtoQuery) FindAll(root proto.Message) []any {
-	debugf("Query: %s", pq.query)
-
-	res := []any{}
-	if root == nil {
-		return res
-	}
-	queue := []queueItem{}
-
+// appendUnique is a drop-in replacement for append, but it checks if the item is already in the queue.
+// Primitive types are admitted unconditionaly. For messages, lists, and maps, we check if the pointer
+// is already in the queue.
+func makeAppendUnique() func([]queueItem, queueItem) []queueItem {
 	memo := make(map[qmemkey]bool)
-	appendUnique := func(q []queueItem, qi queueItem) []queueItem {
+	return func(q []queueItem, qi queueItem) []queueItem {
+		// Hack: ptr is a non-exported field of protoreflect.Value, so we have to "sudo"-get it.
+		// The underlying pointer is an instance of UnsafePointer, hence converting it to uintptr.
 		uptr := uintptr(reflect.ValueOf(qi.ptr).FieldByName("ptr").UnsafePointer())
 		k := qmemkey{
 			qix:  qi.qix,
@@ -125,11 +125,6 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 			debugf("schedule map key: %+v", k)
 		}
 		if uptr == 0 || !canRecurse(qi.ptr) || !memo[k] {
-			step := "<OoB>"
-			if qi.qix < len(pq.query) {
-				step = pq.query[qi.qix].String()
-			}
-			debugf("scheduled: %s step %s", printProtoVal(qi.ptr), step)
 			memo[k] = true
 			q = append(q, qi)
 			debugf("admitted %+v", k)
@@ -138,7 +133,19 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 		}
 		return q
 	}
+}
 
+func (pq *ProtoQuery) FindAll(root proto.Message) []any {
+	if DEBUG {
+		debugf("Query: %s", pq.query)
+	}
+
+	res := []any{}
+	if root == nil {
+		return res
+	}
+	queue := []queueItem{}
+	appendUnique := makeAppendUnique()
 	queue = appendUnique(queue, queueItem{
 		qix: 0,
 		ptr: protoreflect.ValueOf(root.ProtoReflect()),
@@ -147,6 +154,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 	var head queueItem
 	for len(queue) > 0 {
 		head, queue = queue[0], queue[1:]
+		// We've reached the end of the query, so we can append the current pointer to the result.
 		if head.qix >= len(pq.query) {
 			for _, v := range flat(head.ptr) {
 				res = append(res, stripProto(v))
@@ -188,8 +196,8 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 		case KeyQueryStepKind:
 			ks := step.(*KeyQueryStep)
 			if list, ok := toList(head.ptr); ok {
-				// TODO(osdrv): we can pre-compute this as a property of the query
-				// rather than re-computing it on the go.
+				// TODO(osdrv): we can pre-compute isAllPropertyExprs as a property
+				// of the query, rather than doing it on the go.
 				// isAllPropertyExprs would check if the key only consists of
 				// attribute properties. I.e. it only checks if these properties
 				// are present in the message.
@@ -198,7 +206,6 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 				// E.g. [@foo && @bar='value' && true]
 				enforceBool := isAllPropertyExprs(ks.expr)
 				ctx := NewEvalContext(list, WithEnforceBool(enforceBool))
-				//ctx = ctx.Copy(WithEnforceBool(enforceBool))
 				typ, err := ks.expr.Type(ctx)
 				if err != nil {
 					debugf("keyStep.Type(list) returned an error: %s", err)
@@ -222,12 +229,10 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 							debugf("keyStep.Eval(list):bool returned an error on Eval: %s", err)
 							continue
 						}
-						pick, err := toBool(v)
-						if err != nil {
+						if pick, err := toBool(v); err != nil {
 							debugf("keyStep.Eval(list):bool returned an error on toBool: %s", err)
 							continue
-						}
-						if pick {
+						} else if pick {
 							tl.Append(list.Get(i))
 						}
 					}
@@ -235,7 +240,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 						queue = appendUnique(queue, queueItem{
 							qix:   head.qix + 1,
 							ptr:   protoreflect.ValueOf(tl),
-							descr: head.descr, // The type should not change: we are still in a list.
+							descr: head.descr, // The type descriptor won't change: lists have identical signatures.
 						})
 					}
 				case TypeInt:
@@ -249,7 +254,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 						debugf("keyStep.Eval(list):int returned an error on toInt64: %s", err)
 						continue
 					}
-					if ix >= 0 && ix <= int64(list.Len()) {
+					if ix >= 0 && ix < int64(list.Len()) {
 						queue = appendUnique(queue, queueItem{
 							qix: head.qix + 1,
 							ptr: list.Get(int(ix)),
@@ -271,13 +276,14 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 					debugf("No information about map key type, trying the raw value")
 				} else {
 					if fd := head.descr; fd == nil || !fd.IsMap() {
-						panicf("Unexpected descriptor kind: want protoreflect.Map, got %v", head.descr.Kind())
+						debugf("Unexpected descriptor kind: want protoreflect.Map, got %v", head.descr.Kind())
+						continue
 					}
 					var ok bool
-					mkKind := head.descr.MapKey().Kind()
-					k, ok = castToProtoreflectKind(k, mkKind)
+					keyKind := head.descr.MapKey().Kind()
+					k, ok = castToProtoreflectKind(k, keyKind)
 					if !ok {
-						debugf("Can not cast value %+v to protoreflect.Kind=%v", k, mkKind)
+						debugf("Can not cast value %+v to protoreflect.Kind=%v", k, keyKind)
 						continue
 					}
 				}
@@ -342,20 +348,8 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 							descr: fd,
 						})
 					}
-					// progress 1 query step forward (drop recursion)
-					// queue = appendUnique(queue, queueItem{
-					// 	qix:   head.qix + 1,
-					// 	ptr:   msg.Get(fd),
-					// 	descr: fd,
-					// })
 				}
 			} else if list, ok := toList(head.ptr); ok {
-				// progress 1 query step forward (drop recursion)
-				//queue = appendUnique(queue, queueItem{
-				//	qix:   head.qix + 1,
-				//	ptr:   head.ptr,
-				//	descr: head.descr,
-				//})
 				for i := 0; i < list.Len(); i++ {
 					if canRecurse(list.Get(i)) {
 						// preserve the recursive descent query step
@@ -367,12 +361,6 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 					}
 				}
 			} else if mp, ok := toMap(head.ptr); ok {
-				// progress 1 query step forward (drop recursion)
-				//queue = appendUnique(queue, queueItem{
-				//	qix:   head.qix + 1,
-				//	ptr:   head.ptr,
-				//	descr: head.descr,
-				//})
 				mp.Range(func(key protoreflect.MapKey, value protoreflect.Value) bool {
 					if canRecurse(value) {
 						// preserve the recursive descent query step
