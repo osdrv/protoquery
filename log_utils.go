@@ -7,13 +7,13 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 )
 
-func debugf(format string, args ...interface{}) {
+func debugf(format string, args ...any) {
 	if DEBUG {
 		fmt.Printf(format+"\n", args...)
 	}
 }
 
-func panicf(format string, args ...interface{}) {
+func panicf(format string, args ...any) {
 	panic(fmt.Sprintf(format, args...))
 }
 
