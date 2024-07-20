@@ -15,7 +15,6 @@ func TestExpressionType(t *testing.T) {
 		Pages:  432,
 		OnSale: true,
 	}
-	debugf("msg: %v", msg)
 	tests := []struct {
 		name    string
 		input   Expression

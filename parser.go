@@ -222,3 +222,16 @@ func parseBinaryExpression(tokens []*Token, ix int, left Expression, precedence 
 
 	return expr, ix, nil
 }
+
+func matchToken(tokens []*Token, ix int, kind TokenKind) bool {
+	return ix < len(tokens) && tokens[ix].Kind == kind
+}
+
+func matchTokenAny(tokens []*Token, ix int, kinds ...TokenKind) bool {
+	for _, kind := range kinds {
+		if matchToken(tokens, ix, kind) {
+			return true
+		}
+	}
+	return false
+}

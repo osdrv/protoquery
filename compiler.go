@@ -4,50 +4,7 @@ import (
 	"fmt"
 )
 
-func matchToken(tokens []*Token, ix int, kind TokenKind) bool {
-	return ix < len(tokens) && tokens[ix].Kind == kind
-}
-
-func matchTokenAny(tokens []*Token, ix int, kinds ...TokenKind) bool {
-	for _, kind := range kinds {
-		if matchToken(tokens, ix, kind) {
-			return true
-		}
-	}
-	return false
-}
-
-func compileNodeQueryStep(tokens []*Token, ix int) (*NodeQueryStep, int, error) {
-	nqs := &NodeQueryStep{}
-	if !matchToken(tokens, ix, TokenNode) {
-		return nil, ix, fmt.Errorf("expected node name, got %v", tokens[ix].Value)
-	}
-	nqs.name = tokens[ix].Value
-	ix++
-	return nqs, ix, nil
-}
-
-func compileKeyQueryStep(tokens []*Token, ix int) (*KeyQueryStep, int, error) {
-	var expr Expression
-	var err error
-	if !matchToken(tokens, ix, TokenLBracket) {
-		return nil, ix, fmt.Errorf("expected [, got %v", tokens[ix].Value)
-	}
-	ix++
-	expr, ix, err = parseExpression(tokens, ix, LOWEST)
-	if err != nil {
-		return nil, ix, err
-	}
-	if !matchToken(tokens, ix, TokenRBracket) {
-		return nil, ix, fmt.Errorf("expected ], got %v", tokens[ix].Value)
-	}
-	ix++
-	return &KeyQueryStep{
-		expr: expr,
-	}, ix, nil
-}
-
-func CompileQuery(tokens []*Token) (Query, error) {
+func compileQuery(tokens []*Token) (Query, error) {
 	var query Query
 	ix := 0
 	for ix < len(tokens) {
@@ -83,4 +40,34 @@ func CompileQuery(tokens []*Token) (Query, error) {
 		}
 	}
 	return query, nil
+}
+
+func compileNodeQueryStep(tokens []*Token, ix int) (*NodeQueryStep, int, error) {
+	nqs := &NodeQueryStep{}
+	if !matchToken(tokens, ix, TokenNode) {
+		return nil, ix, fmt.Errorf("expected node name, got %v", tokens[ix].Value)
+	}
+	nqs.name = tokens[ix].Value
+	ix++
+	return nqs, ix, nil
+}
+
+func compileKeyQueryStep(tokens []*Token, ix int) (*KeyQueryStep, int, error) {
+	var expr Expression
+	var err error
+	if !matchToken(tokens, ix, TokenLBracket) {
+		return nil, ix, fmt.Errorf("expected [, got %v", tokens[ix].Value)
+	}
+	ix++
+	expr, ix, err = parseExpression(tokens, ix, LOWEST)
+	if err != nil {
+		return nil, ix, err
+	}
+	if !matchToken(tokens, ix, TokenRBracket) {
+		return nil, ix, fmt.Errorf("expected ], got %v", tokens[ix].Value)
+	}
+	ix++
+	return &KeyQueryStep{
+		expr: expr,
+	}, ix, nil
 }

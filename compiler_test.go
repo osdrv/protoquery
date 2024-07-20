@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestCompileQuery(t *testing.T) {
+func TestcompileQuery(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   []*Token
@@ -276,7 +276,7 @@ func TestCompileQuery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := CompileQuery(tt.input)
+			got, err := compileQuery(tt.input)
 			if tt.wantErr != nil {
 				if !errorsSimilar(err, tt.wantErr) {
 					t.Errorf("compileQuery() error = %v, wantErr %v", err, tt.wantErr)

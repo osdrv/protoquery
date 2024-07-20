@@ -33,106 +33,11 @@ func Compile(q string) (*ProtoQuery, error) {
 	if err != nil {
 		return nil, err
 	}
-	query, err := CompileQuery(tokens)
+	query, err := compileQuery(tokens)
 	if err != nil {
 		return nil, err
 	}
 	return &ProtoQuery{query: query}, nil
-}
-
-func nameMatch(n protoreflect.Name, f string) bool {
-	return f == "*" || string(n) == f
-}
-
-func matchMsgFields(m protoreflect.Message, f string) []protoreflect.FieldDescriptor {
-	res := []protoreflect.FieldDescriptor{}
-	ff := m.Interface().ProtoReflect().Descriptor().Fields()
-	for i := 0; i < ff.Len(); i++ {
-		if nameMatch(ff.Get(i).Name(), f) {
-			res = append(res, ff.Get(i))
-		}
-	}
-	return res
-}
-
-func canRecurse(v protoreflect.Value) bool {
-	if v.IsValid() {
-		switch v.Interface().(type) {
-		case protoreflect.Message, protoreflect.List, protoreflect.Map:
-			return true
-		}
-	}
-	return false
-}
-
-func enumStr(fd protoreflect.FieldDescriptor, v protoreflect.Value) (string, bool) {
-	ed := fd.Enum()
-	vv := ed.Values()
-	i := int(v.Enum())
-	if i >= 0 && i < vv.Len() {
-		return string(vv.Get(i).Name()), true
-	}
-	return "", false
-}
-
-// flat return a flat list of value(s). If the value is a message, it returns a list with the only element.
-// If the value is a list, it its elements.
-// The function performs validity check on the value.
-func flat(v protoreflect.Value) []protoreflect.Value {
-	res := []protoreflect.Value{}
-	if isList(v) {
-		for i := 0; i < v.List().Len(); i++ {
-			if vv := v.List().Get(i); vv.IsValid() {
-				res = append(res, v.List().Get(i))
-			}
-		}
-	} else {
-		if v.IsValid() {
-			res = append(res, v)
-		}
-	}
-
-	return res
-}
-
-// stripProto returns the underlying Go value of the protoreflect.Value.
-func stripProto(v protoreflect.Value) any {
-	if !v.IsValid() {
-		return nil
-	}
-	switch v.Interface().(type) {
-	case protoreflect.Message:
-		return v.Message().Interface()
-	default:
-		return v.Interface()
-	}
-}
-
-// appendUnique is a drop-in replacement for append, but it checks if the item is already in the queue.
-// Primitive types are admitted unconditionaly. For messages, lists, and maps, we check if the pointer
-// is already in the queue.
-func makeAppendUnique() func([]queueItem, queueItem) []queueItem {
-	memo := make(map[qmemkey]bool)
-	return func(q []queueItem, qi queueItem) []queueItem {
-		// Hack: ptr is a non-exported field of protoreflect.Value, so we have to "sudo"-get it.
-		// The underlying pointer is an instance of UnsafePointer, hence converting it to uintptr.
-		uptr := uintptr(reflect.ValueOf(qi.ptr).FieldByName("ptr").UnsafePointer())
-		k := qmemkey{
-			qix:  qi.qix,
-			uptr: uptr,
-		}
-		if DEBUG {
-			debugf("schedule map key: %+v", k)
-		}
-		if uptr == 0 || !canRecurse(qi.ptr) || !memo[k] {
-			memo[k] = true
-			q = append(q, qi)
-			debugf("admitted %+v", k)
-		} else {
-			debugf("skipped: %+v", k)
-		}
-		return q
-	}
 }
 
 func (pq *ProtoQuery) FindAll(root proto.Message) []any {
@@ -191,6 +96,8 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 							descr: fd,
 						})
 					}
+				} else {
+					debugf("Node step: %s: not a message, skipping", step)
 				}
 			}
 		case KeyQueryStepKind:
@@ -330,7 +237,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 				panic("TODO(osdrv): not implemented")
 			}
 		case RecursiveDescentQueryStepKind:
-			//debugf("Recursive descent step: %s", step)
+			debugf("Recursive descent step: %s", step)
 			if msg, ok := toMessage(head.ptr); ok {
 				// test the message itself
 				queue = appendUnique(queue, queueItem{
@@ -380,4 +287,31 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 		}
 	}
 	return res
+}
+
+// appendUnique is a drop-in replacement for append, but it checks if the item is already in the queue.
+// Primitive types are admitted unconditionaly. For messages, lists, and maps, we check if the pointer
+// is already in the queue.
+func makeAppendUnique() func([]queueItem, queueItem) []queueItem {
+	memo := make(map[qmemkey]bool)
+	return func(q []queueItem, qi queueItem) []queueItem {
+		// Hack: ptr is a non-exported field of protoreflect.Value, so we have to "sudo"-get it.
+		// The underlying pointer is an instance of UnsafePointer, hence converting it to uintptr.
+		uptr := uintptr(reflect.ValueOf(qi.ptr).FieldByName("ptr").UnsafePointer())
+		k := qmemkey{
+			qix:  qi.qix,
+			uptr: uptr,
+		}
+		if DEBUG {
+			debugf("schedule map key: %+v", k)
+		}
+		if uptr == 0 || !canRecurse(qi.ptr) || !memo[k] {
+			memo[k] = true
+			q = append(q, qi)
+			debugf("admitted %+v", k)
+		} else {
+			debugf("skipped: %+v", k)
+		}
+		return q
+	}
 }
