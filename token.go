@@ -19,7 +19,7 @@ const (
 	TokenDoubleQuote  TokenKind = '"'
 	TokenEqual        TokenKind = '='
 	TokenFloat        TokenKind = 'F' // Float is a pseudo-token that represents a floating point number.
-	TokenNotEqual     TokenKind = '!' // NotEqual is a pseudo-token that represents a not equal operator.
+	TokenNotEqual     TokenKind = 'n' // NotEqual is a pseudo-token that represents a not equal operator.
 	TokenGreater      TokenKind = '>'
 	TokenGreaterEqual TokenKind = 'G' // GreaterEqual is a pseudo-token that represents a greater than or equal operator.
 	TokenLBracket     TokenKind = '['
