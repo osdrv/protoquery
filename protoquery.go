@@ -101,6 +101,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 				}
 			}
 		case KeyQueryStepKind:
+			debugf("KeyQuery step: %s", step)
 			ks := step.(*KeyQueryStep)
 			if list, ok := toList(head.ptr); ok {
 				// TODO(osdrv): we can pre-compute isAllPropertyExprs as a property
@@ -119,6 +120,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 					continue
 				}
 				switch typ {
+				// Grep mode
 				case TypeBool:
 					// 1. Initialize a new list to store the intermediate results.
 					// 2. The list should have the same signature as the original list.
@@ -150,6 +152,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 							descr: head.descr, // The type descriptor won't change: lists have identical signatures.
 						})
 					}
+				// Index mode
 				case TypeInt:
 					v, err := ks.expr.Eval(ctx)
 					if err != nil {

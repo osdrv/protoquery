@@ -702,3 +702,62 @@ func TestFindAllRecursiveDescent(t *testing.T) {
 		})
 	}
 }
+
+func TestFindAllFromREADME(t *testing.T) {
+	ab := &proto.AddressBook{
+		People: []*proto.Person{
+			{
+				Name:  "Alice",
+				Email: "alice@corp.com",
+				Phones: []*proto.Person_PhoneNumber{
+					{Number: "123456", Type: proto.PhoneType_PHONE_TYPE_MOBILE},
+					{Number: "123457", Type: proto.PhoneType_PHONE_TYPE_HOME},
+					{Number: "123458", Type: proto.PhoneType_PHONE_TYPE_WORK},
+				},
+			},
+			{
+				Name:  "John",
+				Email: "john@corp.com",
+				Phones: []*proto.Person_PhoneNumber{
+					{Number: "223456", Type: proto.PhoneType_PHONE_TYPE_MOBILE},
+					{Number: "223457", Type: proto.PhoneType_PHONE_TYPE_HOME},
+					{Number: "223458", Type: proto.PhoneType_PHONE_TYPE_WORK},
+				},
+			},
+			{
+				Name:  "Bob",
+				Email: "bob@corp.com",
+				Phones: []*proto.Person_PhoneNumber{
+					{Number: "323457", Type: proto.PhoneType_PHONE_TYPE_HOME},
+					{Number: "323458", Type: proto.PhoneType_PHONE_TYPE_WORK},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name  string
+		query string
+		want  []any
+	}{
+		{
+			name:  "select first work phone number",
+			query: "/people[@name='John']/phones[@type='PHONE_TYPE_WORK'][0]/number",
+			want:  []any{"223458"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pq, err := Compile(tt.query)
+			if err != nil {
+				t.Errorf("Compile() error = %v, no error expected", err)
+				return
+			}
+			res := pq.FindAll(ab)
+			if !deepEqual(res, tt.want) {
+				t.Errorf("FindAll() = %+v, want %+v", res, tt.want)
+			}
+		})
+	}
+}

@@ -7,7 +7,8 @@ import (
 type QueryStepKind int
 
 const (
-	SelfQueryStepKind QueryStepKind = iota
+	_ QueryStepKind = iota
+	SelfQueryStepKind
 	NodeQueryStepKind
 	KeyQueryStepKind
 	RootQueryStepKind
