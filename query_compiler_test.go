@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestcompileQuery(t *testing.T) {
+func TestCompileQuery(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   []*Token
@@ -269,6 +269,24 @@ func TestcompileQuery(t *testing.T) {
 				&RecursiveDescentQueryStep{},
 				&NodeQueryStep{
 					name: "ancestor",
+				},
+			},
+		},
+		{
+			name: "path with a wildcard node",
+			input: []*Token{
+				NewToken("/", TokenSlash),
+				NewToken("node", TokenNode),
+				NewToken("/", TokenSlash),
+				NewToken("*", TokenStar),
+			},
+			want: Query{
+				&RootQueryStep{},
+				&NodeQueryStep{
+					name: "node",
+				},
+				&NodeQueryStep{
+					name: "*",
 				},
 			},
 		},

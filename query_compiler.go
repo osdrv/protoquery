@@ -21,7 +21,7 @@ func compileQuery(tokens []*Token) (Query, error) {
 		case TokenSlashSlash:
 			query = append(query, &RecursiveDescentQueryStep{})
 			ix++
-		case TokenNode:
+		case TokenNode, TokenStar:
 			var qs *NodeQueryStep
 			qs, ix, err = compileNodeQueryStep(tokens, ix)
 			if err != nil {
@@ -44,7 +44,7 @@ func compileQuery(tokens []*Token) (Query, error) {
 
 func compileNodeQueryStep(tokens []*Token, ix int) (*NodeQueryStep, int, error) {
 	nqs := &NodeQueryStep{}
-	if !matchToken(tokens, ix, TokenNode) {
+	if !matchTokenAny(tokens, ix, TokenNode, TokenStar) {
 		return nil, ix, fmt.Errorf("expected node name, got %v", tokens[ix].Value)
 	}
 	nqs.name = tokens[ix].Value

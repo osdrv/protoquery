@@ -703,6 +703,73 @@ func TestFindAllRecursiveDescent(t *testing.T) {
 	}
 }
 
+func TestFindAllWildcard(t *testing.T) {
+	store := &proto.Bookstore{
+		Books: []*proto.Book{
+			{
+				Title:  "The Go Programming Language",
+				Author: "Alan A. A. Donovan",
+				Price:  34.99,
+			},
+			{
+				Title:  "The Rust Programming Language",
+				Author: "Steve Klabnik",
+				Price:  39.99,
+			},
+			{
+				Title: "The Bible",
+				Price: 0.00,
+			},
+		},
+	}
+
+	tests := []struct {
+		name  string
+		query string
+		want  []any
+	}{
+		{
+			name:  "select all books",
+			query: "/*",
+			want:  []any{store.Books[0], store.Books[1], store.Books[2]},
+		},
+		{
+			name:  "select all book properties",
+			query: "/books[0]/*",
+			want: []any{
+				"The Go Programming Language",
+				"Alan A. A. Donovan",
+				float32(34.99),
+				int32(0),
+				false,
+			},
+		},
+		{
+			name:  "select all properties of all books",
+			query: "/*/*",
+			want: []any{
+				"The Go Programming Language", "Alan A. A. Donovan", float32(34.99), int32(0), false,
+				"The Rust Programming Language", "Steve Klabnik", float32(39.99), int32(0), false,
+				"The Bible", "", float32(0.00), int32(0), false,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pq, err := Compile(tt.query)
+			if err != nil {
+				t.Errorf("Compile() error = %v, no error expected", err)
+				return
+			}
+			res := pq.FindAll(store)
+			if !deepEqual(res, tt.want) {
+				t.Errorf("FindAll() = %+v, want %+v", res, tt.want)
+			}
+		})
+	}
+}
+
 func TestFindAllFromREADME(t *testing.T) {
 	ab := &proto.AddressBook{
 		People: []*proto.Person{
