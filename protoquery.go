@@ -2,7 +2,7 @@ package protoquery
 
 import (
 	"os"
-	reflect "reflect"
+	"reflect"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -12,6 +12,11 @@ type ProtoQuery struct {
 	query Query
 }
 
+type qmemkey struct {
+	qix  int
+	uptr uintptr
+}
+
 // queueItem is an internal structure to keep track of the moving multi-head pointer.
 type queueItem struct {
 	qix   int
@@ -19,9 +24,15 @@ type queueItem struct {
 	descr protoreflect.FieldDescriptor
 }
 
-type qmemkey struct {
-	qix  int
-	uptr uintptr
+func (qi queueItem) Serialize() (qmemkey, bool) {
+	uptr := uintptr(reflect.ValueOf(qi.ptr).FieldByName("ptr").UnsafePointer())
+	if uptr == 0 || !canRecurse(qi.ptr) {
+		return qmemkey{}, false
+	}
+	return qmemkey{
+		qix:  qi.qix,
+		uptr: uptr,
+	}, true
 }
 
 var (
@@ -49,16 +60,16 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 	if root == nil {
 		return res
 	}
-	queue := []queueItem{}
-	appendUnique := makeAppendUnique()
-	queue = appendUnique(queue, queueItem{
+
+	queue := NewQueue[qmemkey, queueItem]()
+	queue.PushUniq(queueItem{
 		qix: 0,
 		ptr: protoreflect.ValueOf(root.ProtoReflect()),
 	})
 
 	var head queueItem
-	for len(queue) > 0 {
-		head, queue = queue[0], queue[1:]
+	for queue.Len() > 0 {
+		head = queue.Pop()
 		// We've reached the end of the query, so we can append the current pointer to the result.
 		if head.qix >= len(pq.query) {
 			for _, v := range flat(head.ptr) {
@@ -74,7 +85,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 		switch step.Kind() {
 		case RootQueryStepKind:
 			debugf("Root step: %s", step)
-			queue = appendUnique(queue, queueItem{
+			queue.PushUniq(queueItem{
 				qix:   head.qix + 1,
 				ptr:   head.ptr,
 				descr: head.descr,
@@ -90,7 +101,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 								val = protoreflect.ValueOfString(e)
 							}
 						}
-						queue = appendUnique(queue, queueItem{
+						queue.PushUniq(queueItem{
 							qix:   head.qix + 1,
 							ptr:   val,
 							descr: fd,
@@ -146,7 +157,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 						}
 					}
 					if tl.Len() > 0 {
-						queue = appendUnique(queue, queueItem{
+						queue.PushUniq(queueItem{
 							qix:   head.qix + 1,
 							ptr:   protoreflect.ValueOf(tl),
 							descr: head.descr, // The type descriptor won't change: lists have identical signatures.
@@ -165,7 +176,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 						continue
 					}
 					if ix >= 0 && ix < int64(list.Len()) {
-						queue = appendUnique(queue, queueItem{
+						queue.PushUniq(queueItem{
 							qix: head.qix + 1,
 							ptr: list.Get(int(ix)),
 							// TODO(osdrv): type descriptor
@@ -200,7 +211,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 				exprval := protoreflect.ValueOf(k)
 				key := exprval.MapKey()
 				if mp.Has(key) {
-					queue = appendUnique(queue, queueItem{
+					queue.PushUniq(queueItem{
 						qix:   head.qix + 1,
 						ptr:   mp.Get(key),
 						descr: head.descr.MapValue(),
@@ -228,7 +239,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 					continue
 				}
 				if ix >= 0 && int(ix) < len(bytes) {
-					queue = appendUnique(queue, queueItem{
+					queue.PushUniq(queueItem{
 						qix: head.qix + 1,
 						// protoreflect does not support any ints below 32bits, hence the type casting
 						ptr: protoreflect.ValueOf(uint32(bytes[ix])),
@@ -249,7 +260,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 					continue
 				}
 				if pick {
-					queue = appendUnique(queue, queueItem{
+					queue.PushUniq(queueItem{
 						qix:   head.qix + 1,
 						ptr:   head.ptr,
 						descr: head.descr,
@@ -264,7 +275,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 			debugf("Recursive descent step: %s", step)
 			if msg, ok := toMessage(head.ptr); ok {
 				// test the message itself
-				queue = appendUnique(queue, queueItem{
+				queue.PushUniq(queueItem{
 					qix:   head.qix + 1,
 					ptr:   head.ptr,
 					descr: head.descr,
@@ -273,7 +284,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 				for _, fd := range matchMsgFields(msg, "*") {
 					if canRecurse(msg.Get(fd)) {
 						// preserve the recursive descent query step
-						queue = appendUnique(queue, queueItem{
+						queue.PushUniq(queueItem{
 							qix:   head.qix,
 							ptr:   msg.Get(fd),
 							descr: fd,
@@ -284,7 +295,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 				for i := 0; i < list.Len(); i++ {
 					if canRecurse(list.Get(i)) {
 						// preserve the recursive descent query step
-						queue = appendUnique(queue, queueItem{
+						queue.PushUniq(queueItem{
 							qix:   head.qix,
 							ptr:   list.Get(i),
 							descr: head.descr,
@@ -295,7 +306,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 				mp.Range(func(key protoreflect.MapKey, value protoreflect.Value) bool {
 					if canRecurse(value) {
 						// preserve the recursive descent query step
-						queue = appendUnique(queue, queueItem{
+						queue.PushUniq(queueItem{
 							qix:   head.qix,
 							ptr:   value,
 							descr: head.descr.MapValue(),
@@ -311,31 +322,4 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 		}
 	}
 	return res
-}
-
-// appendUnique is a drop-in replacement for append, but it checks if the item is already in the queue.
-// Primitive types are admitted unconditionaly. For messages, lists, and maps, we check if the pointer
-// is already in the queue.
-func makeAppendUnique() func([]queueItem, queueItem) []queueItem {
-	memo := make(map[qmemkey]bool)
-	return func(q []queueItem, qi queueItem) []queueItem {
-		// Hack: ptr is a non-exported field of protoreflect.Value, so we have to "sudo"-get it.
-		// The underlying pointer is an instance of UnsafePointer, hence converting it to uintptr.
-		uptr := uintptr(reflect.ValueOf(qi.ptr).FieldByName("ptr").UnsafePointer())
-		k := qmemkey{
-			qix:  qi.qix,
-			uptr: uptr,
-		}
-		if DEBUG {
-			debugf("schedule map key: %+v", k)
-		}
-		if uptr == 0 || !canRecurse(qi.ptr) || !memo[k] {
-			memo[k] = true
-			q = append(q, qi)
-			debugf("admitted %+v", k)
-		} else {
-			debugf("skipped: %+v", k)
-		}
-		return q
-	}
 }
