@@ -551,6 +551,26 @@ func TestExpressionEval(t *testing.T) {
 			ctx:  NewEvalContext(nil),
 			want: true,
 		},
+		{
+			name: "binary expression = with empty context object and EnforceBool=true",
+			input: &BinaryExpr{
+				left:  NewLiteralExpr(2, TypeInt),
+				right: NewLiteralExpr(2, TypeInt),
+				op:    OpEq,
+			},
+			ctx:  NewEvalContext(nil, WithEnforceBool(true)),
+			want: true,
+		},
+		{
+			name: "binary expression = with non-empty context object and EnforceBool=true",
+			input: &BinaryExpr{
+				left:  NewPropertyExpr("title"),
+				right: NewLiteralExpr("The Go Programming Language", TypeString),
+				op:    OpEq,
+			},
+			ctx:  NewEvalContext(msg.ProtoReflect(), WithEnforceBool(true)),
+			want: true,
+		},
 	}
 
 	for _, tt := range tests {

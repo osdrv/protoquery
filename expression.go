@@ -200,7 +200,7 @@ func (p *PropertyExpr) Type(ctx EvalContext) (Type, error) {
 	// to support `.` (this) operator.
 	msg, ok := ctx.This().(protoreflect.Message)
 	if !ok {
-		return TypeUnknown, fmt.Errorf("Invalid list value %T, want: protoreflect.Message", ctx.This())
+		return TypeUnknown, fmt.Errorf("Invalid proto value %T, want: protoreflect.Message", ctx.This())
 	}
 	fd, ok := findFieldByName(msg.Interface(), p.name)
 	if !ok {
@@ -376,6 +376,11 @@ func typesCompatible(a, b Type) bool {
 }
 
 func (b *BinaryExpr) Eval(ctx EvalContext) (any, error) {
+	if ctx.Options().EnforceBool && b.evalsToBool() {
+		// If the expression is expected to evaluate to a boolean,
+		// we don't have to enforce it with the context so drop the flag.
+		ctx = ctx.Copy(WithEnforceBool(false))
+	}
 	ltyp, lerr := b.left.Type(ctx)
 	if lerr != nil {
 		return nil, lerr
@@ -431,6 +436,12 @@ func (b *BinaryExpr) Type(ctx EvalContext) (Type, error) {
 
 func (b *BinaryExpr) String() string {
 	return fmt.Sprintf("%v %v %v", b.left, OpToStr[b.op], b.right)
+}
+
+func (b *BinaryExpr) evalsToBool() bool {
+	return b.op == OpEq || b.op == OpNe || b.op == OpLt ||
+		b.op == OpLe || b.op == OpGt || b.op == OpGe ||
+		b.op == OpAnd || b.op == OpOr
 }
 
 func numericBinEval(ctx EvalContext, a, b Expression, op Operator) (any, error) {
