@@ -24,6 +24,9 @@ func (q *Queue[K, T]) Push(item T) {
 	q.items = append(q.items, item)
 }
 
+// PushUniq implements a "queue once" semantics. The memo is never flushed.
+// This could be a problem if a high amount of items being enqueued and
+// the key cardinality is high.
 func (q *Queue[K, T]) PushUniq(item T) {
 	if k, ok := item.Serialize(); ok {
 		if _, ok := q.memo[k]; ok {
