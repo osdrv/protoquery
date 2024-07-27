@@ -676,11 +676,11 @@ func TestFindAllRecursiveDescent(t *testing.T) {
 			query: "//children[@string_val='B']/int_val",
 			want:  []any{int32(1), int32(2), int32(3)},
 		},
-		//{
-		//	name:  "intermediate recursive descent with no explicit node step",
-		//	query: "/children//[@string_val='B']/int_val",
-		//	want:  []any{int32(1), int32(2), int32(3)},
-		//},
+		{
+			name:  "intermediate recursive descent with no explicit node step",
+			query: "/children//[@string_val='B']/int_val",
+			want:  []any{int32(1), int32(2), int32(3)},
+		},
 		{
 			name:  "intermediate recursive descent with an explicit node step",
 			query: "/children//children[@string_val='B']/int_val",

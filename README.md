@@ -75,6 +75,6 @@ Contributions are welcome! Please open a ticket or a pull request.
 
 ProtoQuery is licensed under the MIT license. Please see the LICENSE file for more information.
 
-## Author
+## Author and Copyright
 
-Oleg Sidorov, 2024
+© Oleg Sidorov, 2024

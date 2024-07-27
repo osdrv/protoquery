@@ -235,7 +235,28 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 						// TODO(osdrv): type descriptor
 					})
 				}
+			} else if msg, ok := toMessage(head.ptr); ok {
+				// We always enforce bool context on a message.
+				ctx := NewEvalContext(msg)
+				v, err := ks.expr.Eval(ctx)
+				if err != nil {
+					debugf("keyStep.Eval(message) returned an error: %s", err)
+					continue
+				}
+				pick, err := toBool(v)
+				if err != nil {
+					debugf("keyStep.Eval(message) returned an error on toBool: %s", err)
+					continue
+				}
+				if pick {
+					queue = appendUnique(queue, queueItem{
+						qix:   head.qix + 1,
+						ptr:   head.ptr,
+						descr: head.descr,
+					})
+				}
 			} else {
+				debugf("Current pointer: %s", printProtoVal(head.ptr))
 				debugf("Key step: %s", step)
 				panic("TODO(osdrv): not implemented")
 			}
