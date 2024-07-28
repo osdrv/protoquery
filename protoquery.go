@@ -61,8 +61,8 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 		return res
 	}
 
-	queue := NewQueue[qmemkey, queueItem]()
-	queue.PushUniq(queueItem{
+	queue := NewQueueOnce[qmemkey, queueItem]()
+	queue.Push(queueItem{
 		qix: 0,
 		ptr: protoreflect.ValueOf(root.ProtoReflect()),
 	})
@@ -85,7 +85,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 		switch step.Kind() {
 		case RootQueryStepKind:
 			debugf("Root step: %s", step)
-			queue.PushUniq(queueItem{
+			queue.Push(queueItem{
 				qix:   head.qix + 1,
 				ptr:   head.ptr,
 				descr: head.descr,
@@ -101,7 +101,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 								val = protoreflect.ValueOfString(e)
 							}
 						}
-						queue.PushUniq(queueItem{
+						queue.Push(queueItem{
 							qix:   head.qix + 1,
 							ptr:   val,
 							descr: fd,
@@ -155,7 +155,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 						}
 					}
 					if tl.Len() > 0 {
-						queue.PushUniq(queueItem{
+						queue.Push(queueItem{
 							qix:   head.qix + 1,
 							ptr:   protoreflect.ValueOf(tl),
 							descr: head.descr, // The type descriptor won't change: lists have identical signatures.
@@ -174,7 +174,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 						continue
 					}
 					if ix >= 0 && ix < int64(list.Len()) {
-						queue.PushUniq(queueItem{
+						queue.Push(queueItem{
 							qix: head.qix + 1,
 							ptr: list.Get(int(ix)),
 							// TODO(osdrv): type descriptor
@@ -209,7 +209,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 				exprval := protoreflect.ValueOf(k)
 				key := exprval.MapKey()
 				if mp.Has(key) {
-					queue.PushUniq(queueItem{
+					queue.Push(queueItem{
 						qix:   head.qix + 1,
 						ptr:   mp.Get(key),
 						descr: head.descr.MapValue(),
@@ -237,7 +237,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 					continue
 				}
 				if ix >= 0 && int(ix) < len(bytes) {
-					queue.PushUniq(queueItem{
+					queue.Push(queueItem{
 						qix: head.qix + 1,
 						// protoreflect does not support any ints below 32bits, hence the type casting
 						ptr: protoreflect.ValueOf(uint32(bytes[ix])),
@@ -258,7 +258,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 					continue
 				}
 				if pick {
-					queue.PushUniq(queueItem{
+					queue.Push(queueItem{
 						qix:   head.qix + 1,
 						ptr:   head.ptr,
 						descr: head.descr,
@@ -273,7 +273,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 			debugf("Recursive descent step: %s", step)
 			if msg, ok := toMessage(head.ptr); ok {
 				// test the message itself
-				queue.PushUniq(queueItem{
+				queue.Push(queueItem{
 					qix:   head.qix + 1,
 					ptr:   head.ptr,
 					descr: head.descr,
@@ -282,7 +282,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 				for _, fd := range matchMsgFields(msg, "*") {
 					if canRecurse(msg.Get(fd)) {
 						// preserve the recursive descent query step
-						queue.PushUniq(queueItem{
+						queue.Push(queueItem{
 							qix:   head.qix,
 							ptr:   msg.Get(fd),
 							descr: fd,
@@ -293,7 +293,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 				for i := 0; i < list.Len(); i++ {
 					if canRecurse(list.Get(i)) {
 						// preserve the recursive descent query step
-						queue.PushUniq(queueItem{
+						queue.Push(queueItem{
 							qix:   head.qix,
 							ptr:   list.Get(i),
 							descr: head.descr,
@@ -304,7 +304,7 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 				mp.Range(func(key protoreflect.MapKey, value protoreflect.Value) bool {
 					if canRecurse(value) {
 						// preserve the recursive descent query step
-						queue.PushUniq(queueItem{
+						queue.Push(queueItem{
 							qix:   head.qix,
 							ptr:   value,
 							descr: head.descr.MapValue(),
