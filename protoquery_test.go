@@ -121,6 +121,21 @@ func TestFindAllChilrenAccess(t *testing.T) {
 			},
 		},
 		{
+			name:  "child element by multiple attribute presence",
+			query: "/books[@author && @price]",
+			want: []any{
+				store.Books[0],
+				store.Books[1],
+			},
+		},
+		{
+			name:  "child element by attribute presence and attribute comparison",
+			query: "/books[@author && @price>35]",
+			want: []any{
+				store.Books[1],
+			},
+		},
+		{
 			name:  "child element by attribute equality",
 			query: "/books[@author='Alan A. A. Donovan']",
 			want: []any{

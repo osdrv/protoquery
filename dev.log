@@ -1,3 +1,56 @@
+2024-07-28 - Boolean-computing expression analysis
+
+Context enforcement is an approach that helps the interpreter figure out what
+specific type it should cast the expression result to. For example, key step
+expressions of non-boolean types should be casted to booleans in a list context,
+like a property presence expression:
+
+    LIST[@prop]
+
+This expression filters out LIST elements with unset @prop.
+@prop could be of any type, but the result of this expression should be casted
+to a boolean. In other words, we need to enforce boolean context on this expression.
+This comes in contrast to a map context where a context enforcement might lead to an
+unexpected result.
+
+A slight complication of the previous case is when we check presence of multiple
+properties:
+
+    LIST[@foo && @bar]
+
+In this case we've got a binary AND-expression. Both operands are expected to be
+boolean expressions, i.e. if @foo is a number and @bar is a string, the interpreter
+should enforce the boolean context on both expressions.
+
+Compare this to a comparison boolean expression:
+
+    LIST[@prop >= 42]
+
+In this example @prop should be evaluated to its native type (assuming a number)
+and the comparison expression would naturally evaluate to a boolean. No boolean
+context enforcement is required.
+
+Combining the 2 examples above
+
+    LIST[@foo && @bar > 42]
+
+In this case the entire boolean AND-epression is getting evaluated to a boolean.
+It also requires both operands to be casted to a boolean. I.e. @foo has be
+force-casted to a boolean and the right hand comparison expression evaluates
+to a boolean natively, hence no boolean enforcement is required on @bar.
+
+This allows us to conclude the rules of the boolean context enforcement:
+1. List context requires an enforcement of a boolean-evaluating context.
+2.1. Under a boolean context enforcement, any property accessor operator
+    should evaluate to a boolean value indicating the presence of the property
+    in the context object.
+2.2. Non-enforced context should cause a property accessor operator evaluating
+    in the native type of the property.
+3.1. Boolean binary expressions (AND- and OR-) should propagate boolean type
+    enforcement to its operands.
+3.2. Comparison expressions natively result in a boolean and hence should stop
+    the context enforcement propagation.
+
 2024-07-13 - Avoid re-entring visited nodes
 
 Assume the following root message:

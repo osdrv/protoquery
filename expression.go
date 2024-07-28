@@ -376,8 +376,8 @@ func typesCompatible(a, b Type) bool {
 }
 
 func (b *BinaryExpr) Eval(ctx EvalContext) (any, error) {
-	if ctx.Options().EnforceBool && b.evalsToBool() {
-		// If the expression is expected to evaluate to a boolean,
+	if ctx.Options().EnforceBool && b.computesBool() {
+		// If the expression is known to compute a boolean,
 		// we don't have to enforce it with the context so drop the flag.
 		ctx = ctx.Copy(WithEnforceBool(false))
 	}
@@ -438,10 +438,12 @@ func (b *BinaryExpr) String() string {
 	return fmt.Sprintf("%v %v %v", b.left, OpToStr[b.op], b.right)
 }
 
-func (b *BinaryExpr) evalsToBool() bool {
+func (b *BinaryExpr) computesBool() bool {
+	// OpAnd and OpOr would also evaluate to a boolean, but the operands
+	// are expected to be boolean. Unlike the ones listed below that would
+	// take any type of operands and output a boolean result.
 	return b.op == OpEq || b.op == OpNe || b.op == OpLt ||
-		b.op == OpLe || b.op == OpGt || b.op == OpGe ||
-		b.op == OpAnd || b.op == OpOr
+		b.op == OpLe || b.op == OpGt || b.op == OpGe
 }
 
 func numericBinEval(ctx EvalContext, a, b Expression, op Operator) (any, error) {
@@ -657,8 +659,9 @@ func enumBinEval(ctx EvalContext, a, b Expression, op Operator) (any, error) {
 	}
 }
 
-// isAllProps is a helper function that traverses the expression tree and returns true
-// if all the expressions are either properties or binary AND/OR expressions.
+// isAllProps is a helper function that traverses the expression tree and returns
+// true if all the expressions are either properties, boolean-evaluating expressions
+// or binary expressions whose operands evaluate to booleans.
 func isAllPropertyExprs(e Expression) bool {
 	if e == nil {
 		return false
@@ -668,6 +671,9 @@ func isAllPropertyExprs(e Expression) bool {
 		return true
 	case *BinaryExpr:
 		be := e.(*BinaryExpr)
+		if be.computesBool() {
+			return true
+		}
 		return (be.op == OpAnd || be.op == OpOr) &&
 			isAllPropertyExprs(be.left) && isAllPropertyExprs(be.right)
 	default:

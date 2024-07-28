@@ -571,6 +571,16 @@ func TestExpressionEval(t *testing.T) {
 			ctx:  NewEvalContext(msg.ProtoReflect(), WithEnforceBool(true)),
 			want: true,
 		},
+		{
+			name: "binary expression with 2 non-boolean expressions and EnforceBool=true",
+			input: &BinaryExpr{
+				left:  NewPropertyExpr("title"),
+				right: NewPropertyExpr("author"),
+				op:    OpAnd,
+			},
+			ctx:  NewEvalContext(msg.ProtoReflect(), WithEnforceBool(true)),
+			want: true,
+		},
 	}
 
 	for _, tt := range tests {

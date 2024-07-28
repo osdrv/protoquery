@@ -344,6 +344,25 @@ func TestParseExpression(t *testing.T) {
 				op: OpNot,
 			},
 		},
+		{
+			name: "binary with multiple property presence checks",
+			tokens: []*Token{
+				NewToken("@", TokenAt),
+				NewToken("foo", TokenNode),
+				NewToken("&&", TokenAnd),
+				NewToken("@", TokenAt),
+				NewToken("bar", TokenNode),
+			},
+			want: &BinaryExpr{
+				left: &PropertyExpr{
+					name: "foo",
+				},
+				right: &PropertyExpr{
+					name: "bar",
+				},
+				op: OpAnd,
+			},
+		},
 	}
 
 	for _, tt := range tests {

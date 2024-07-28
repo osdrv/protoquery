@@ -23,7 +23,7 @@ func TestCompileQuery(t *testing.T) {
 			},
 		},
 		{
-			name: "node with attribute presence",
+			name: "node with attribute presence check",
 			input: []*Token{
 				NewToken("nodename", TokenNode),
 				NewToken("[", TokenLBracket),
@@ -38,6 +38,35 @@ func TestCompileQuery(t *testing.T) {
 				&KeyQueryStep{
 					expr: &PropertyExpr{
 						name: "attr",
+					},
+				},
+			},
+		},
+		{
+			name: "node with multiple attribute presence checks",
+			input: []*Token{
+				NewToken("nodename", TokenNode),
+				NewToken("[", TokenLBracket),
+				NewToken("@", TokenAt),
+				NewToken("foo", TokenNode),
+				NewToken("&&", TokenAnd),
+				NewToken("@", TokenAt),
+				NewToken("bar", TokenNode),
+				NewToken("]", TokenRBracket),
+			},
+			want: Query{
+				&NodeQueryStep{
+					name: "nodename",
+				},
+				&KeyQueryStep{
+					expr: &BinaryExpr{
+						left: &PropertyExpr{
+							name: "foo",
+						},
+						right: &PropertyExpr{
+							name: "bar",
+						},
+						op: OpAnd,
 					},
 				},
 			},

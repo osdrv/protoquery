@@ -121,8 +121,6 @@ func (pq *ProtoQuery) FindAll(root proto.Message) []any {
 				// attribute properties. I.e. it only checks if these properties
 				// are present in the message.
 				// E.g. [@foo && @bar && @baz]
-				// TODO(osdrv): all props + bool checks is still boolean.
-				// E.g. [@foo && @bar='value' && true]
 				enforceBool := isAllPropertyExprs(ks.expr)
 				ctx := NewEvalContext(list, WithEnforceBool(enforceBool))
 				typ, err := ks.expr.Type(ctx)
